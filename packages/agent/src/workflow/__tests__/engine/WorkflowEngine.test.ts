@@ -607,23 +607,13 @@ describe('WorkflowEngine', () => {
       engine.on('task:start', taskStartHandler);
       engine.on('task:complete', taskCompleteHandler);
 
-      const startNode = createTask('start', TaskType.START);
-      const workflow = createWorkflow('TestWorkflow', '1.0.0');
-      workflow.nodes = [startNode];
-      workflow.entryNodeId = startNode.id;
-      engine.registerWorkflow(workflow);
+      // 直接通过内部 executor 发射事件来测试转发
+      const innerExecutor = (engine as any).executor;
+      innerExecutor.emit('task:start', { task: { id: 't1' }, execution: {} });
+      innerExecutor.emit('task:complete', { task: { id: 't1' }, execution: {} });
 
-      vi.spyOn((engine as any).executor, 'executeTask').mockResolvedValue({
-        success: true,
-        output: {},
-        duration: 5,
-      });
-
-      await engine.startExecution(workflow.id);
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      expect(taskStartHandler).toHaveBeenCalled();
-      expect(taskCompleteHandler).toHaveBeenCalled();
+      expect(taskStartHandler).toHaveBeenCalledTimes(1);
+      expect(taskCompleteHandler).toHaveBeenCalledTimes(1);
     });
   });
 

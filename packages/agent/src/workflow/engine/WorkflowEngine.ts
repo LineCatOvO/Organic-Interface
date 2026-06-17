@@ -203,6 +203,7 @@ export class WorkflowEngine extends EventEmitter {
     execution = updateWorkflowExecution(execution, {
       status: WorkflowExecutionStatus.PAUSED,
     });
+    this.executions.set(executionId, execution);
 
     // Pause all running tasks
     this.executor.clearActiveExecutions();
@@ -228,6 +229,7 @@ export class WorkflowEngine extends EventEmitter {
     execution = updateWorkflowExecution(execution, {
       status: WorkflowExecutionStatus.RUNNING,
     });
+    this.executions.set(executionId, execution);
 
     this.emit('execution:resumed', { execution });
 
@@ -253,6 +255,7 @@ export class WorkflowEngine extends EventEmitter {
       status: WorkflowExecutionStatus.CANCELLED,
       finishedAt: Date.now(),
     });
+    this.executions.set(executionId, execution);
 
     this.emit('execution:cancelled', { execution });
     return true;

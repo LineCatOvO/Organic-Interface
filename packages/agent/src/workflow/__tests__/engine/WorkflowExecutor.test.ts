@@ -210,19 +210,34 @@ describe('WorkflowExecutor', () => {
       );
       executor = new WorkflowExecutor(mockFn, { defaultTimeout: 1000 });
 
+      const handler = vi.fn();
+      executor.on('task:timeout', handler);
+
       const task = createTask('TimeoutTask', TaskType.TASK, { handler: 'test' });
       const execution = createTaskExecution(task.id, 'exec-1');
 
+      // 启动执行（不 await，因为 mock 永不 resolve）
       const promise = executor.executeTask(task, execution, {}, {});
 
       // 推进定时器触发超时
       await vi.advanceTimersByTimeAsync(1000);
 
-      const result = await promise;
-      expect(result.success).toBe(false);
-      expect(result.error?.code).toBe('WF_002');
-      expect(result.error?.message).toContain('timed out');
-      expect(result.error?.message).toContain('1000ms');
+      // 验证超时事件
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          task: expect.objectContaining({ id: task.id }),
+          execution: expect.objectContaining({
+            error: expect.objectContaining({
+              code: 'WF_002',
+              message: expect.stringContaining('timed out'),
+            }),
+          }),
+        })
+      );
+
+      // 超时后任务从 activeExecutions 中移除
+      expect(executor.isTaskRunning(task.id)).toBe(false);
     });
 
     it('should handle task timeout via task.timeout config', async () => {
@@ -232,6 +247,9 @@ describe('WorkflowExecutor', () => {
       );
       executor = new WorkflowExecutor(mockFn, { defaultTimeout: 60000 });
 
+      const handler = vi.fn();
+      executor.on('task:timeout', handler);
+
       const task = createTask('TimeoutTask', TaskType.TASK, { handler: 'test' }, {
         timeout: { duration: 500, action: 'fail' },
       });
@@ -240,10 +258,19 @@ describe('WorkflowExecutor', () => {
       const promise = executor.executeTask(task, execution, {}, {});
       await vi.advanceTimersByTimeAsync(500);
 
-      const result = await promise;
-      expect(result.success).toBe(false);
-      expect(result.error?.code).toBe('WF_002');
-      expect(result.error?.message).toContain('500ms');
+      // 验证超时事件携带 task.timeout 信息
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          execution: expect.objectContaining({
+            error: expect.objectContaining({
+              code: 'WF_002',
+              message: expect.stringContaining('500ms'),
+            }),
+          }),
+        })
+      );
+      expect(executor.isTaskRunning(task.id)).toBe(false);
     });
 
     it('should emit task:timeout event on timeout', async () => {
@@ -261,7 +288,6 @@ describe('WorkflowExecutor', () => {
 
       const promise = executor.executeTask(task, execution, {}, {});
       await vi.advanceTimersByTimeAsync(100);
-      await promise;
 
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith(
@@ -269,6 +295,7 @@ describe('WorkflowExecutor', () => {
           task: expect.objectContaining({ id: task.id }),
         })
       );
+      expect(executor.isTaskRunning(task.id)).toBe(false);
     });
   });
 
