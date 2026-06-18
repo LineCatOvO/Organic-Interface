@@ -1,6 +1,6 @@
 # Organic-Interface AGENTS_README
 
-> 最后更新: 2026-06-14 | 更新者: Coder
+> 最后更新: 2026-06-18 | 更新者: Reviewer
 
 ## 项目概述
 
@@ -53,7 +53,7 @@ e2e/                    - 端到端测试
 - **分支策略**: agent-develop 单分支开发
 - **提交规范**: conventional commits
 - **代码规范**: ESLint (@typescript-eslint) + Prettier，配置在 eslint.config.js
-- **测试要求**: vitest 测试框架，78 个测试文件，2386 个测试用例
+- **测试要求**: vitest 测试框架，79 个测试文件，2817 个测试用例，整体语句覆盖率 92.64%
 
 ## 关键依赖
 
