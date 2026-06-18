@@ -791,7 +791,7 @@ describe('UIAgent', () => {
         expect(data.operation).toBe('click');
         requestEmitted = true;
       });
-      agent.on('operation:execute', data => {
+      agent.on('operation:execute', _data => {
         executeEmitted = true;
       });
       await agent.start();

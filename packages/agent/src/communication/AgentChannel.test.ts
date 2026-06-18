@@ -5,7 +5,6 @@ import {
   createExecuteMessage,
   createNotifyMessage,
   createResponseMessage,
-  createErrorMessage,
   createAgentMessage,
   DeliveryMode,
   MessagePriority,
@@ -365,9 +364,14 @@ describe('AgentChannel - sendAndWait response handling', () => {
   });
 
   it('should resolve when response message with matching correlationId is received', async () => {
-    const requestMessage = createExecuteMessage('test-agent', 'target-agent', { task: 'test' }, {
-      correlationId: 'corr-123',
-    });
+    const requestMessage = createExecuteMessage(
+      'test-agent',
+      'target-agent',
+      { task: 'test' },
+      {
+        correlationId: 'corr-123',
+      }
+    );
 
     // Start sendAndWait
     const responsePromise = channel.sendAndWait(requestMessage, { timeout: 5000 });
@@ -387,9 +391,14 @@ describe('AgentChannel - sendAndWait response handling', () => {
   });
 
   it('should reject when error response with matching correlationId is received', async () => {
-    const requestMessage = createExecuteMessage('test-agent', 'target-agent', { task: 'test' }, {
-      correlationId: 'corr-err',
-    });
+    const requestMessage = createExecuteMessage(
+      'test-agent',
+      'target-agent',
+      { task: 'test' },
+      {
+        correlationId: 'corr-err',
+      }
+    );
 
     const responsePromise = channel.sendAndWait(requestMessage, { timeout: 5000 });
 
@@ -412,9 +421,14 @@ describe('AgentChannel - sendAndWait response handling', () => {
   });
 
   it('should reject with unknown error when error message has no error message field', async () => {
-    const requestMessage = createExecuteMessage('test-agent', 'target-agent', {}, {
-      correlationId: 'corr-unknown',
-    });
+    const requestMessage = createExecuteMessage(
+      'test-agent',
+      'target-agent',
+      {},
+      {
+        correlationId: 'corr-unknown',
+      }
+    );
 
     const responsePromise = channel.sendAndWait(requestMessage, { timeout: 5000 });
 
@@ -594,10 +608,7 @@ describe('AgentChannel - publish filter coverage', () => {
 
   it('should filter by predicate', async () => {
     const handler = vi.fn();
-    channel.subscribe(
-      { predicate: msg => msg.priority === MessagePriority.HIGH },
-      handler
-    );
+    channel.subscribe({ predicate: msg => msg.priority === MessagePriority.HIGH }, handler);
 
     const highPriorityMessage = createAgentMessage({
       source: 'src',
@@ -639,9 +650,14 @@ describe('AgentChannel - publish filter coverage', () => {
 describe('AgentChannel - dispose with pending requests', () => {
   it('should reject pending requests on dispose', async () => {
     const channel = new AgentChannel({ agentId: 'test-agent', defaultTimeout: 10000 });
-    const message = createExecuteMessage('test-agent', 'target', {}, {
-      correlationId: 'pending-1',
-    });
+    const message = createExecuteMessage(
+      'test-agent',
+      'target',
+      {},
+      {
+        correlationId: 'pending-1',
+      }
+    );
 
     const responsePromise = channel.sendAndWait(message, { timeout: 10000 });
 
@@ -657,7 +673,13 @@ describe('AgentChannel - dispose with pending requests', () => {
     channel.subscribe({ action: MessageAction.NOTIFY }, vi.fn());
 
     // Add some history
-    channel.addToHistory as any; // private method, test via send
+    (channel as any).addToHistory({
+      messageId: 'test-msg',
+      agentId: 'test-agent',
+      action: MessageAction.EXECUTE,
+      payload: 'test',
+      timestamp: Date.now(),
+    });
     channel.dispose();
 
     expect(channel.getHistory()).toEqual([]);

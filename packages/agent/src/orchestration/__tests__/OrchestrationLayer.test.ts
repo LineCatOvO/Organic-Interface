@@ -326,7 +326,9 @@ describe('OrchestrationLayer', () => {
 
     it('should handle orchestration exception', async () => {
       // 可追溯性: 覆盖 OrchestrationLayer.ts L378-385 catch 分支
-      vi.spyOn((layer as any).coordinator, 'execute').mockRejectedValue(new Error('Coordinator crashed'));
+      vi.spyOn((layer as any).coordinator, 'execute').mockRejectedValue(
+        new Error('Coordinator crashed')
+      );
 
       const result = await layer.orchestrate({
         requestId: 'req-exception',
@@ -463,9 +465,7 @@ describe('OrchestrationLayer', () => {
         requestId: 'req-no-decompose',
         taskName: 'parent',
         payload: {
-          subTasks: [
-            { subTaskId: 'st1', taskName: 'sub1', payload: {}, dependsOn: [] },
-          ],
+          subTasks: [{ subTaskId: 'st1', taskName: 'sub1', payload: {}, dependsOn: [] }],
         },
       });
 
@@ -512,7 +512,9 @@ describe('OrchestrationLayer', () => {
       const plan = layer.createPlan([{ requestId: 'req-1', taskName: 'task1', payload: {} }]);
       layer.pause(plan.planId);
 
-      vi.spyOn((layer as any).coordinator, 'executeWithPlan').mockRejectedValue(new Error('Resume failed'));
+      vi.spyOn((layer as any).coordinator, 'executeWithPlan').mockRejectedValue(
+        new Error('Resume failed')
+      );
 
       const result = await layer.resume(plan.planId);
       expect(result.success).toBe(false);
@@ -605,14 +607,23 @@ describe('OrchestrationLayer', () => {
       const handler = vi.fn();
       layer.on('orchestration:step-complete', handler);
 
-      const stepResult: ExecutionResult = { success: true, data: 'step-data', duration: 5, attempts: 1 };
+      const stepResult: ExecutionResult = {
+        success: true,
+        data: 'step-data',
+        duration: 5,
+        attempts: 1,
+      };
       (layer as any).coordinator.emit('execution:step-complete', {
         requestId: 'req-1',
         stepId: 'step-1',
         result: stepResult,
       });
 
-      expect(handler).toHaveBeenCalledWith({ requestId: 'req-1', stepId: 'step-1', result: stepResult });
+      expect(handler).toHaveBeenCalledWith({
+        requestId: 'req-1',
+        stepId: 'step-1',
+        result: stepResult,
+      });
     });
 
     it('should forward execution:step-failed event', async () => {
@@ -626,7 +637,11 @@ describe('OrchestrationLayer', () => {
         error: 'Step failed',
       });
 
-      expect(handler).toHaveBeenCalledWith({ requestId: 'req-1', stepId: 'step-1', error: 'Step failed' });
+      expect(handler).toHaveBeenCalledWith({
+        requestId: 'req-1',
+        stepId: 'step-1',
+        error: 'Step failed',
+      });
     });
   });
 

@@ -310,15 +310,17 @@ describe('DatabaseStorage', () => {
 
     it('should throw when getAll called on uninitialized storage', async () => {
       // 异常路径：未初始化时调用 getAll
-      const uninitStorage = new DatabaseStorage({ dbPath: path.join(os.tmpdir(), 'uninit-getall') });
-      await expect(uninitStorage.getAll()).rejects.toThrow(
-        'Database storage is not initialized'
-      );
+      const uninitStorage = new DatabaseStorage({
+        dbPath: path.join(os.tmpdir(), 'uninit-getall'),
+      });
+      await expect(uninitStorage.getAll()).rejects.toThrow('Database storage is not initialized');
     });
 
     it('should throw when getByType called on uninitialized storage', async () => {
       // 异常路径：未初始化时调用 getByType
-      const uninitStorage = new DatabaseStorage({ dbPath: path.join(os.tmpdir(), 'uninit-getbytype') });
+      const uninitStorage = new DatabaseStorage({
+        dbPath: path.join(os.tmpdir(), 'uninit-getbytype'),
+      });
       await expect(uninitStorage.getByType('any-type')).rejects.toThrow(
         'Database storage is not initialized'
       );
@@ -327,22 +329,20 @@ describe('DatabaseStorage', () => {
     it('should throw when query called on uninitialized storage', async () => {
       // 异常路径：未初始化时调用 query
       const uninitStorage = new DatabaseStorage({ dbPath: path.join(os.tmpdir(), 'uninit-query') });
-      await expect(uninitStorage.query({})).rejects.toThrow(
-        'Database storage is not initialized'
-      );
+      await expect(uninitStorage.query({})).rejects.toThrow('Database storage is not initialized');
     });
 
     it('should throw when clear called on uninitialized storage', async () => {
       // 异常路径：未初始化时调用 clear
       const uninitStorage = new DatabaseStorage({ dbPath: path.join(os.tmpdir(), 'uninit-clear') });
-      await expect(uninitStorage.clear()).rejects.toThrow(
-        'Database storage is not initialized'
-      );
+      await expect(uninitStorage.clear()).rejects.toThrow('Database storage is not initialized');
     });
 
     it('should throw when delete called on uninitialized storage', async () => {
       // 异常路径：未初始化时调用 delete
-      const uninitStorage = new DatabaseStorage({ dbPath: path.join(os.tmpdir(), 'uninit-delete') });
+      const uninitStorage = new DatabaseStorage({
+        dbPath: path.join(os.tmpdir(), 'uninit-delete'),
+      });
       await expect(uninitStorage.delete('any-id')).rejects.toThrow(
         'Database storage is not initialized'
       );
@@ -350,7 +350,9 @@ describe('DatabaseStorage', () => {
 
     it('should throw when batchSet called on uninitialized storage', async () => {
       // 异常路径：未初始化时调用 batchSet
-      const uninitStorage = new DatabaseStorage({ dbPath: path.join(os.tmpdir(), 'uninit-batchset') });
+      const uninitStorage = new DatabaseStorage({
+        dbPath: path.join(os.tmpdir(), 'uninit-batchset'),
+      });
       await expect(uninitStorage.batchSet([])).rejects.toThrow(
         'Database storage is not initialized'
       );
@@ -358,7 +360,9 @@ describe('DatabaseStorage', () => {
 
     it('should throw when batchDelete called on uninitialized storage', async () => {
       // 异常路径：未初始化时调用 batchDelete
-      const uninitStorage = new DatabaseStorage({ dbPath: path.join(os.tmpdir(), 'uninit-batchdel') });
+      const uninitStorage = new DatabaseStorage({
+        dbPath: path.join(os.tmpdir(), 'uninit-batchdel'),
+      });
       await expect(uninitStorage.batchDelete([])).rejects.toThrow(
         'Database storage is not initialized'
       );

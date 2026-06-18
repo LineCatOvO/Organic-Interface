@@ -320,16 +320,14 @@ describe('UIOperationManager', () => {
   describe('execute retry logic', () => {
     it('should retry on failure and succeed on retry', async () => {
       const executeMock = vi.fn();
-      executeMock
-        .mockRejectedValueOnce(new Error('First attempt failed'))
-        .mockResolvedValueOnce({
-          operationId: 'op-1',
-          type: OP_TYPES.click,
-          success: true,
-          executionTime: 10,
-          status: 'success',
-          timestamp: Date.now(),
-        });
+      executeMock.mockRejectedValueOnce(new Error('First attempt failed')).mockResolvedValueOnce({
+        operationId: 'op-1',
+        type: OP_TYPES.click,
+        success: true,
+        executionTime: 10,
+        status: 'success',
+        timestamp: Date.now(),
+      });
 
       const mockHandler = {
         getType: () => OP_TYPES.click,

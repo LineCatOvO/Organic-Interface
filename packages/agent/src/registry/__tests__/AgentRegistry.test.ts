@@ -752,7 +752,6 @@ describe('AgentRegistry', () => {
       shortLeaseRegistry.registerAgent('agent-1', 'Agent1', AgentType.EXECUTOR);
 
       // Wait for lease to expire
-      const past = Date.now() - 200;
       // Manually expire by updating internal state via heartbeat with old timestamp
       // We need to access the entry - use update to trigger version increment
       // Actually, let's just wait a bit
@@ -787,9 +786,7 @@ describe('AgentRegistry', () => {
           expect(unregisteredHandler).toHaveBeenCalledWith(
             expect.objectContaining({ agentId: 'agent-1' })
           );
-          expect(cleanupHandler).toHaveBeenCalledWith(
-            expect.objectContaining({ removed: 1 })
-          );
+          expect(cleanupHandler).toHaveBeenCalledWith(expect.objectContaining({ removed: 1 }));
           shortLeaseRegistry.dispose();
           resolve();
         }, 100);
@@ -1232,9 +1229,7 @@ describe('AgentRegistry', () => {
       // The timer callback should have fired
       await vi.runAllTimersAsync();
 
-      expect(timeoutHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ agentId: 'agent-1' })
-      );
+      expect(timeoutHandler).toHaveBeenCalledWith(expect.objectContaining({ agentId: 'agent-1' }));
 
       shortLeaseRegistry.dispose();
       vi.useRealTimers();

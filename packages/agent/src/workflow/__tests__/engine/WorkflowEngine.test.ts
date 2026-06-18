@@ -493,10 +493,15 @@ describe('WorkflowEngine', () => {
     it('should update dependencies for downstream nodes', async () => {
       // 可追溯性: 覆盖 WorkflowEngine.ts L539-585 updateDependencyStatus
       const startNode = createTask('start', TaskType.START, {}, { id: 'start-node' });
-      const dependentTask = createTask('dependent', TaskType.TASK, { handler: 'dep' }, {
-        id: 'dep-node',
-        dependencies: [{ taskId: 'start-node' }],
-      });
+      const dependentTask = createTask(
+        'dependent',
+        TaskType.TASK,
+        { handler: 'dep' },
+        {
+          id: 'dep-node',
+          dependencies: [{ taskId: 'start-node' }],
+        }
+      );
       const workflow = createWorkflow('TestWorkflow', '1.0.0');
       workflow.nodes = [startNode, dependentTask];
       workflow.entryNodeId = startNode.id;
@@ -525,10 +530,15 @@ describe('WorkflowEngine', () => {
     it('should respect requiredStatus in dependencies', async () => {
       // 可追溯性: 覆盖 WorkflowEngine.ts L572-574 dep.requiredStatus 分支
       const startNode = createTask('start', TaskType.START, {}, { id: 'start-node' });
-      const dependentTask = createTask('dependent', TaskType.TASK, { handler: 'dep' }, {
-        id: 'dep-node',
-        dependencies: [{ taskId: 'start-node', requiredStatus: TaskStatus.COMPLETED }],
-      });
+      const dependentTask = createTask(
+        'dependent',
+        TaskType.TASK,
+        { handler: 'dep' },
+        {
+          id: 'dep-node',
+          dependencies: [{ taskId: 'start-node', requiredStatus: TaskStatus.COMPLETED }],
+        }
+      );
       const workflow = createWorkflow('TestWorkflow', '1.0.0');
       workflow.nodes = [startNode, dependentTask];
       workflow.entryNodeId = startNode.id;

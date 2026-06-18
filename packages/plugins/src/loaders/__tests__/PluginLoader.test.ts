@@ -1399,7 +1399,8 @@ describe('PluginLoader', () => {
     let tempDir: string;
 
     beforeEach(() => {
-      tempDir = '/tmp/test-load-import-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+      tempDir =
+        '/tmp/test-load-import-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
     });
 
     afterEach(() => {
@@ -1446,10 +1447,7 @@ describe('PluginLoader', () => {
       // CJS/ESM interop 会添加 default 属性，但 default 不是构造函数
       const pluginDir = path.join(tempDir!, 'no-export-plugin', 'dist');
       fs.mkdirSync(pluginDir, { recursive: true });
-      fs.writeFileSync(
-        path.join(pluginDir, 'index.js'),
-        `module.exports = { someValue: 42 };`
-      );
+      fs.writeFileSync(path.join(pluginDir, 'index.js'), `module.exports = { someValue: 42 };`);
 
       const loader = new PluginLoader({ baseDir: tempDir!, cacheEnabled: false });
       const result = await loader.load('no-export-plugin');

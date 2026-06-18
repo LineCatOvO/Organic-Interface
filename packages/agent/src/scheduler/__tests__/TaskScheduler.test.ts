@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TaskScheduler, type TaskExecutor } from '../TaskScheduler.js';
-import { TaskPriority, TaskStatus } from '../TaskQueue.js';
+import { TaskPriority } from '../TaskQueue.js';
 
 vi.mock('@organic/utils', () => ({
   createLogger: () => ({
@@ -318,7 +318,7 @@ describe('TaskScheduler', () => {
       });
       s.setExecutor(blockingExecutor);
 
-      const task1 = s.schedule({ name: 'BlockingTask' });
+      s.schedule({ name: 'BlockingTask' });
       const task2 = s.schedule({ name: 'PendingTask' });
 
       const handler = vi.fn();
@@ -611,7 +611,7 @@ describe('TaskScheduler', () => {
       await new Promise(resolve => setTimeout(resolve, 200));
 
       // Should have been called multiple times due to retries
-      expect(executor.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect((executor as any).mock.calls.length).toBeGreaterThanOrEqual(2);
       s.stop();
     });
   });

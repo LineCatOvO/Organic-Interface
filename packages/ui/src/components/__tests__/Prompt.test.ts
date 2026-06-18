@@ -359,9 +359,7 @@ describe('Prompt', () => {
     it('should return empty array for empty multiselect input', () => {
       const prompt = new Prompt();
       vi.spyOn(prompt as any, 'readLine').mockReturnValue('   ');
-      const options = [
-        { value: 'a', label: 'Option A' },
-      ];
+      const options = [{ value: 'a', label: 'Option A' }];
       const result = prompt.render('Choose:', { type: 'multiselect', options });
       // Empty input after trim returns default value
       expect(result.answered).toBe(true);
@@ -375,7 +373,7 @@ describe('Prompt', () => {
       vi.spyOn(prompt as any, 'readLine').mockReturnValue('invalid');
       const result = prompt.render('Enter:', {
         type: 'text',
-        validate: (value) => (value === 'invalid' ? 'Invalid value' : null),
+        validate: value => (value === 'invalid' ? 'Invalid value' : null),
       });
       expect(result.answered).toBe(false);
       expect(result.error).toBe('Invalid value');
@@ -397,7 +395,7 @@ describe('Prompt', () => {
       vi.spyOn(prompt as any, 'readLine').mockReturnValue('valid');
       const result = prompt.render('Enter:', {
         type: 'text',
-        validate: (value) => (value === 'invalid' ? 'Invalid value' : null),
+        validate: value => (value === 'invalid' ? 'Invalid value' : null),
       });
       expect(result.answered).toBe(true);
       expect(result.value).toBe('valid');

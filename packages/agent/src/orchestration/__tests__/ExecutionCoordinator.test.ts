@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ExecutionCoordinator, type ExecutionRequest, type ExecutionResult } from '../ExecutionCoordinator.js';
+import { ExecutionCoordinator, type ExecutionRequest } from '../ExecutionCoordinator.js';
 import { AgentRegistry } from '../../registry/AgentRegistry.js';
 import { AgentType, createAgentMetadata } from '../../registry/AgentMetadata.js';
 
@@ -160,7 +160,7 @@ describe('ExecutionCoordinator', () => {
       registry.register(metadata);
 
       const mockChannel = { sendAndWait: vi.fn().mockResolvedValue({ output: 'success' }) };
-      vi.spyOn((coordinator as any), 'getOrCreateChannel').mockReturnValue(mockChannel);
+      vi.spyOn(coordinator as any, 'getOrCreateChannel').mockReturnValue(mockChannel);
 
       const request: ExecutionRequest = {
         requestId: 'req-success',
@@ -182,7 +182,7 @@ describe('ExecutionCoordinator', () => {
       registry.register(metadata);
 
       const mockChannel = { sendAndWait: vi.fn().mockResolvedValue('target-result') };
-      vi.spyOn((coordinator as any), 'getOrCreateChannel').mockReturnValue(mockChannel);
+      vi.spyOn(coordinator as any, 'getOrCreateChannel').mockReturnValue(mockChannel);
 
       const request: ExecutionRequest = {
         requestId: 'req-target',
@@ -203,7 +203,7 @@ describe('ExecutionCoordinator', () => {
       registry.register(metadata);
 
       const mockChannel = { sendAndWait: vi.fn().mockResolvedValue('event-result') };
-      vi.spyOn((coordinator as any), 'getOrCreateChannel').mockReturnValue(mockChannel);
+      vi.spyOn(coordinator as any, 'getOrCreateChannel').mockReturnValue(mockChannel);
 
       const handler = vi.fn();
       coordinator.on('execution:complete', handler);
@@ -236,8 +236,8 @@ describe('ExecutionCoordinator', () => {
           .mockRejectedValueOnce(new Error('First attempt failed'))
           .mockResolvedValueOnce('retry-success'),
       };
-      vi.spyOn((coordinator as any), 'getOrCreateChannel').mockReturnValue(mockChannel);
-      vi.spyOn((coordinator as any), 'sleep').mockResolvedValue(undefined);
+      vi.spyOn(coordinator as any, 'getOrCreateChannel').mockReturnValue(mockChannel);
+      vi.spyOn(coordinator as any, 'sleep').mockResolvedValue(undefined);
 
       const result = await coordinator.execute({
         requestId: 'req-retry',
@@ -260,8 +260,8 @@ describe('ExecutionCoordinator', () => {
       const mockChannel = {
         sendAndWait: vi.fn().mockRejectedValue(new Error('Always fails')),
       };
-      vi.spyOn((coordinator as any), 'getOrCreateChannel').mockReturnValue(mockChannel);
-      vi.spyOn((coordinator as any), 'sleep').mockResolvedValue(undefined);
+      vi.spyOn(coordinator as any, 'getOrCreateChannel').mockReturnValue(mockChannel);
+      vi.spyOn(coordinator as any, 'sleep').mockResolvedValue(undefined);
 
       const handler = vi.fn();
       coordinator.on('execution:failed', handler);
@@ -296,7 +296,7 @@ describe('ExecutionCoordinator', () => {
           .mockResolvedValueOnce('first-result')
           .mockResolvedValueOnce('second-result'),
       };
-      vi.spyOn((coordinator as any), 'getOrCreateChannel').mockReturnValue(mockChannel);
+      vi.spyOn(coordinator as any, 'getOrCreateChannel').mockReturnValue(mockChannel);
 
       const context = new Map<string, unknown>();
       const requests: ExecutionRequest[] = [
@@ -318,7 +318,7 @@ describe('ExecutionCoordinator', () => {
       registry.register(metadata);
 
       const mockChannel = { sendAndWait: vi.fn().mockResolvedValue('plan-result') };
-      vi.spyOn((coordinator as any), 'getOrCreateChannel').mockReturnValue(mockChannel);
+      vi.spyOn(coordinator as any, 'getOrCreateChannel').mockReturnValue(mockChannel);
 
       // 创建带依赖的计划
       const plan = coordinator.createPlan([
@@ -347,7 +347,7 @@ describe('ExecutionCoordinator', () => {
       registry.register(metadata);
 
       const mockChannel = { sendAndWait: vi.fn().mockResolvedValue('step-result') };
-      vi.spyOn((coordinator as any), 'getOrCreateChannel').mockReturnValue(mockChannel);
+      vi.spyOn(coordinator as any, 'getOrCreateChannel').mockReturnValue(mockChannel);
 
       const startHandler = vi.fn();
       const completeHandler = vi.fn();
@@ -376,8 +376,8 @@ describe('ExecutionCoordinator', () => {
       registry.register(metadata);
 
       const mockChannel = { sendAndWait: vi.fn().mockRejectedValue(new Error('Step failed')) };
-      vi.spyOn((coordinator as any), 'getOrCreateChannel').mockReturnValue(mockChannel);
-      vi.spyOn((coordinator as any), 'sleep').mockResolvedValue(undefined);
+      vi.spyOn(coordinator as any, 'getOrCreateChannel').mockReturnValue(mockChannel);
+      vi.spyOn(coordinator as any, 'sleep').mockResolvedValue(undefined);
 
       const failHandler = vi.fn();
       coordinator.on('execution:step-failed', failHandler);
@@ -435,13 +435,21 @@ describe('ExecutionCoordinator', () => {
       let resolveSend: (value: unknown) => void = () => {};
       const mockChannel = {
         sendAndWait: vi.fn().mockImplementation(
-          () => new Promise(resolve => { resolveSend = resolve; })
+          () =>
+            new Promise(resolve => {
+              resolveSend = resolve;
+            })
         ),
       };
-      vi.spyOn((coordinator as any), 'getOrCreateChannel').mockReturnValue(mockChannel);
+      vi.spyOn(coordinator as any, 'getOrCreateChannel').mockReturnValue(mockChannel);
 
       const plan = coordinator.createPlan([
-        { requestId: 'req-cancel', taskName: 'task1', payload: {}, retryConfig: { maxAttempts: 1 } },
+        {
+          requestId: 'req-cancel',
+          taskName: 'task1',
+          payload: {},
+          retryConfig: { maxAttempts: 1 },
+        },
       ]);
 
       // 开始执行但不等待
