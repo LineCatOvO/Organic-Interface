@@ -1114,6 +1114,133 @@ describe('AgentRegistry', () => {
     });
   });
 
+  // Traceability: ST-05 covers performHealthChecks private method
+  describe('performHealthChecks', () => {
+    it('should mark agent as OFFLINE when heartbeat is stale', () => {
+      const shortTimeoutRegistry = new AgentRegistry({
+        heartbeatTimeout: 50,
+        enableAutoCleanup: false,
+        enableHealthCheck: false,
+      });
+      shortTimeoutRegistry.start();
+      shortTimeoutRegistry.registerAgent('agent-1', 'Agent1', AgentType.EXECUTOR, {
+        capabilities: [{ id: 'cap1' }],
+      });
+
+      // Make heartbeat stale
+      shortTimeoutRegistry.update('agent-1', { lastHeartbeatAt: Date.now() - 100 });
+
+      const healthCheckHandler = vi.fn();
+      const statusChangeHandler = vi.fn();
+      shortTimeoutRegistry.on('agent:health-check', healthCheckHandler);
+      shortTimeoutRegistry.on('agent:status-change', statusChangeHandler);
+
+      // Call private method
+      (shortTimeoutRegistry as any).performHealthChecks();
+
+      expect(healthCheckHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: 'agent-1',
+          result: expect.objectContaining({
+            healthy: false,
+            error: 'Heartbeat timeout',
+          }),
+        })
+      );
+      expect(statusChangeHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: 'agent-1',
+          newStatus: AgentRegistryStatus.OFFLINE,
+        })
+      );
+
+      const agent = shortTimeoutRegistry.get('agent-1');
+      expect(agent?.status).toBe(AgentRegistryStatus.OFFLINE);
+      expect(agent?.healthCheck?.healthy).toBe(false);
+
+      shortTimeoutRegistry.dispose();
+    });
+
+    it('should not mark already OFFLINE agent again', () => {
+      const shortTimeoutRegistry = new AgentRegistry({
+        heartbeatTimeout: 50,
+        enableAutoCleanup: false,
+        enableHealthCheck: false,
+      });
+      shortTimeoutRegistry.start();
+      shortTimeoutRegistry.registerAgent('agent-1', 'Agent1', AgentType.EXECUTOR);
+      shortTimeoutRegistry.updateStatus('agent-1', AgentRegistryStatus.OFFLINE);
+      shortTimeoutRegistry.update('agent-1', { lastHeartbeatAt: Date.now() - 100 });
+
+      const statusChangeHandler = vi.fn();
+      shortTimeoutRegistry.on('agent:status-change', statusChangeHandler);
+
+      // Call private method - should not emit again since already OFFLINE
+      (shortTimeoutRegistry as any).performHealthChecks();
+
+      // status-change handler should not be called again for this agent
+      const offlineCalls = statusChangeHandler.mock.calls.filter(
+        (call: any[]) => call[0].agentId === 'agent-1'
+      );
+      expect(offlineCalls).toHaveLength(0);
+
+      shortTimeoutRegistry.dispose();
+    });
+
+    it('should not mark agent with recent heartbeat', () => {
+      const shortTimeoutRegistry = new AgentRegistry({
+        heartbeatTimeout: 5000,
+        enableAutoCleanup: false,
+        enableHealthCheck: false,
+      });
+      shortTimeoutRegistry.start();
+      shortTimeoutRegistry.registerAgent('agent-1', 'Agent1', AgentType.EXECUTOR);
+
+      const statusChangeHandler = vi.fn();
+      shortTimeoutRegistry.on('agent:status-change', statusChangeHandler);
+
+      (shortTimeoutRegistry as any).performHealthChecks();
+
+      // Should not be called because heartbeat is recent
+      expect(statusChangeHandler).not.toHaveBeenCalled();
+
+      shortTimeoutRegistry.dispose();
+    });
+  });
+
+  // Traceability: ST-05 covers heartbeat timer callback
+  describe('heartbeat timer callback', () => {
+    it('should emit heartbeat-timeout when lease expires in timer', async () => {
+      vi.useFakeTimers();
+
+      const shortLeaseRegistry = new AgentRegistry({
+        heartbeatTimeout: 50,
+        leaseDuration: 100,
+        enableAutoCleanup: false,
+        enableHealthCheck: false,
+      });
+      shortLeaseRegistry.start();
+
+      const timeoutHandler = vi.fn();
+      shortLeaseRegistry.on('agent:heartbeat-timeout', timeoutHandler);
+
+      shortLeaseRegistry.registerAgent('agent-1', 'Agent1', AgentType.EXECUTOR);
+
+      // Advance time past heartbeatTimeout + 5000
+      vi.advanceTimersByTime(10000);
+
+      // The timer callback should have fired
+      await vi.runAllTimersAsync();
+
+      expect(timeoutHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'agent-1' })
+      );
+
+      shortLeaseRegistry.dispose();
+      vi.useRealTimers();
+    });
+  });
+
   // Traceability: ST-05 covers unregister with status-change event
   describe('unregister additional coverage', () => {
     it('should emit agent:status-change with OFFLINE on unregister', () => {

@@ -398,6 +398,7 @@ describe('OrchestrationLayer', () => {
       const layer2 = new OrchestrationLayer(registry, undefined, { autoDecompose: true });
       const autoResults: ExecutionResult[] = [
         { success: true, data: 'r1', duration: 5, attempts: 1 },
+        { success: true, data: 'r2', duration: 5, attempts: 1 },
       ];
       const mockPlan = { requestId: 'plan-1', steps: [], parallelGroups: [] };
       vi.spyOn((layer2 as any).coordinator, 'createPlan').mockReturnValue(mockPlan);
@@ -409,6 +410,7 @@ describe('OrchestrationLayer', () => {
         payload: {
           subTasks: [
             { subTaskId: 's1', taskName: 'sub1', payload: {}, dependsOn: [] },
+            { subTaskId: 's2', taskName: 'sub2', payload: {}, dependsOn: [] },
           ],
         },
         strategy: OrchestrationStrategy.AUTO,
@@ -427,7 +429,9 @@ describe('OrchestrationLayer', () => {
         { success: true, data: 'sub1-result', duration: 5, attempts: 1 },
         { success: true, data: 'sub2-result', duration: 5, attempts: 1 },
       ];
-      vi.spyOn((layer2 as any).coordinator, 'executeSequential').mockResolvedValue(results);
+      const mockPlan = { requestId: 'plan-decomp', steps: [], parallelGroups: [] };
+      vi.spyOn((layer2 as any).coordinator, 'createPlan').mockReturnValue(mockPlan);
+      vi.spyOn((layer2 as any).coordinator, 'executeWithPlan').mockResolvedValue(results);
 
       const result = await layer2.orchestrate({
         requestId: 'req-decompose',

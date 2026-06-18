@@ -1654,4 +1654,140 @@ describe('PluginLoader', () => {
       expect(resolveSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('ST-03: load - load 静态函数路径', () => {
+    let tempDir: string;
+
+    beforeEach(() => {
+      tempDir = '/tmp/test-load-fn-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    });
+
+    afterEach(() => {
+      try {
+        fs.rmSync(tempDir!, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    });
+
+    it('should use load static function when module exports load', async () => {
+      // 覆盖 PluginLoader.ts L116-117: typeof pluginModule.load === 'function' 分支
+      const pluginDir = path.join(tempDir!, 'load-fn-plugin', 'dist');
+      fs.mkdirSync(pluginDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(pluginDir, 'index.js'),
+        `
+        class LoadFnPlugin {
+          name = 'LoadFnPlugin';
+          version = '1.0.0';
+          getMetadata() {
+            return { id: 'load-fn-plugin', name: 'LoadFnPlugin', version: '1.0.0', apiVersion: '1.0.0' };
+          }
+          async initialize() { return { success: true }; }
+          async execute() { return { success: true, data: {} }; }
+        }
+        module.exports = {
+          load: async () => new LoadFnPlugin(),
+          default: LoadFnPlugin,
+        };
+        module.exports.default = LoadFnPlugin;
+        `
+      );
+
+      const loader = new PluginLoader({ baseDir: tempDir!, cacheEnabled: false });
+      const result = await loader.load('load-fn-plugin');
+
+      expect(result.success).toBe(true);
+      expect(result.metadata?.id).toBe('load-fn-plugin');
+    });
+  });
+
+  describe('ST-03: load - 无效导出路径', () => {
+    let tempDir: string;
+
+    beforeEach(() => {
+      tempDir = '/tmp/test-no-export-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    });
+
+    afterEach(() => {
+      try {
+        fs.rmSync(tempDir!, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    });
+
+    it('should return error when module has neither load nor default export', async () => {
+      // 覆盖 PluginLoader.ts L120-125: else 分支（无 load 函数且无 default 导出）
+      const pluginDir = path.join(tempDir!, 'no-export-2-plugin', 'dist');
+      fs.mkdirSync(pluginDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(pluginDir, 'index.js'),
+        // 导出 null 使 default 为 null（falsy），load 也不是函数
+        `module.exports = null;`
+      );
+
+      const loader = new PluginLoader({ baseDir: tempDir!, cacheEnabled: false });
+      const result = await loader.load('no-export-2-plugin');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('does not export a valid plugin');
+    });
+  });
+
+  describe('ST-03: createKernelApi - text 和 info 服务方法', () => {
+    it('should provide working text service stub methods', () => {
+      // 覆盖 PluginLoader.ts L457-465: text 服务的 stub 方法
+      const loader = new PluginLoader({ baseDir: '/tmp/test-text-stubs' });
+      const kernelApi = (loader as any).createKernelApi.call(loader, 'test-text');
+
+      const text = kernelApi.text;
+      expect(text.formatTable()).toBe('');
+      expect(text.formatList()).toBe('');
+      expect(text.formatSection()).toBe('');
+      expect(text.styled('hello')).toBe('hello');
+      expect(text.success('ok')).toBe('ok');
+      expect(text.error('err')).toBe('err');
+      expect(text.warning('warn')).toBe('warn');
+      expect(text.info('info')).toBe('info');
+      expect(text.progress()).toBe('');
+    });
+
+    it('should provide working info service stub methods', () => {
+      // 覆盖 PluginLoader.ts L469-480: info 服务的 stub 方法
+      const loader = new PluginLoader({ baseDir: '/tmp/test-info-stubs' });
+      const kernelApi = (loader as any).createKernelApi.call(loader, 'test-info');
+
+      const info = kernelApi.info;
+      expect(info.getConfig()).toBeUndefined();
+      expect(info.getAllConfigs()).toEqual({});
+      expect(info.getRuntimeInfo()).toEqual({});
+      expect(info.getProjectContext()).toEqual({});
+      expect(info.getProjectRoot()).toBe('');
+      expect(info.getProjectName()).toBe('');
+      expect(info.getProjectVersion()).toBe('');
+      expect(info.getSystemInfo()).toEqual({});
+      expect(info.getPlatformInfo()).toEqual({});
+      expect(info.getEnv()).toBeUndefined();
+      expect(info.getAllEnvs()).toEqual({});
+    });
+
+    it('should provide stubs for text.createStream and text.spinner', () => {
+      // 覆盖 PluginLoader.ts L465-467: createStream 和 spinner stub
+      const loader = new PluginLoader({ baseDir: '/tmp/test-stream-stub' });
+      const kernelApi = (loader as any).createKernelApi.call(loader, 'test-stream');
+
+      expect(kernelApi.text.createStream()).toEqual({});
+      expect(kernelApi.text.spinner()).toEqual({});
+    });
+
+    it('should print and println without throwing', () => {
+      // 覆盖 PluginLoader.ts L455-456: print 和 println stub
+      const loader = new PluginLoader({ baseDir: '/tmp/test-print' });
+      const kernelApi = (loader as any).createKernelApi.call(loader, 'test-print');
+
+      expect(() => kernelApi.text.print('hello')).not.toThrow();
+      expect(() => kernelApi.text.println('world')).not.toThrow();
+    });
+  });
 });

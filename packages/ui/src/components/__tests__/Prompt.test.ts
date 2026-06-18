@@ -585,4 +585,16 @@ describe('Prompt', () => {
       expect(result).toBe('secret123');
     });
   });
+
+  // Traceability: ST-07 covers getInput error logging (line 307)
+  describe('renderText with validation error', () => {
+    it('should return empty string when validation fails', () => {
+      const prompt = new Prompt();
+      vi.spyOn(prompt as any, 'readLine').mockReturnValue('bad input');
+      const result = prompt.renderText('Enter:', {
+        validate: () => 'Validation error occurred',
+      });
+      expect(result).toBe('');
+    });
+  });
 });

@@ -40,7 +40,7 @@ describe('ContextService', () => {
 
   describe('constructor', () => {
     it('should create service with default config', () => {
-      expect(service).toBeDefined();
+      expect(service).toBeInstanceOf(ContextService);
     });
 
     it('should accept custom config', () => {
@@ -50,7 +50,7 @@ describe('ContextService', () => {
         enablePropagation: false,
         maxNestingDepth: 10,
       });
-      expect(customService).toBeDefined();
+      expect(customService).toBeInstanceOf(ContextService);
       customService.dispose();
     });
   });
@@ -59,8 +59,8 @@ describe('ContextService', () => {
     it('should create new context', () => {
       const context = service.createContext('session-1', createTestParticipants());
 
-      expect(context).toBeDefined();
-      expect(context.id).toBeDefined();
+      expect(context).not.toBeNull();
+      expect(typeof context.id).toBe('string');
       expect(context.sessionId).toBe('session-1');
       expect(context.status).toBe('active');
     });
@@ -90,7 +90,7 @@ describe('ContextService', () => {
       const created = service.createContext('session-1', createTestParticipants());
       const retrieved = service.getContext(created.id);
 
-      expect(retrieved).toBeDefined();
+      expect(retrieved).not.toBeNull();
       expect(retrieved?.id).toBe(created.id);
     });
 
@@ -140,7 +140,7 @@ describe('ContextService', () => {
       service.archiveContext(context.id);
 
       const restored = service.restoreContext(context.id);
-      expect(restored).toBeDefined();
+      expect(restored).not.toBeNull();
       expect(restored?.status).toBe('active');
     });
   });
@@ -221,7 +221,7 @@ describe('ContextService', () => {
 
       service.addContextItem(item);
       const retrieved = service.getContextItem(context.id, 'item-1');
-      expect(retrieved).toBeDefined();
+      expect(retrieved).not.toBeNull();
     });
 
     it('should get all context items with filter', () => {
@@ -318,7 +318,7 @@ describe('ContextService', () => {
       const context = service.createContext('session-1', createTestParticipants());
 
       const frame = service.pushExecutionFrame(context.id, 'agent-1');
-      expect(frame).toBeDefined();
+      expect(frame).not.toBeNull();
       expect(frame?.agentId).toBe('agent-1');
       expect(frame?.contextId).toBe(context.id);
     });
@@ -329,7 +329,7 @@ describe('ContextService', () => {
       service.pushExecutionFrame(context.id, 'agent-1');
       const popped = service.popExecutionFrame(context.id, 'result');
 
-      expect(popped).toBeDefined();
+      expect(popped).not.toBeNull();
       expect(popped?.result).toBe('result');
       expect(popped?.status).toBe('completed');
     });
@@ -344,7 +344,7 @@ describe('ContextService', () => {
       });
 
       expect(popped?.status).toBe('failed');
-      expect(popped?.error).toBeDefined();
+      expect(popped?.error).not.toBeUndefined();
     });
 
     it('should return null when popping empty stack', () => {
@@ -360,7 +360,7 @@ describe('ContextService', () => {
       service.pushExecutionFrame(context.id, 'agent-1');
       const frame = service.getCurrentFrame(context.id);
 
-      expect(frame).toBeDefined();
+      expect(frame).not.toBeNull();
       expect(frame?.agentId).toBe('agent-1');
     });
 
@@ -427,10 +427,10 @@ describe('ContextService', () => {
         }
       );
 
-      expect(result.incremental).toBeDefined();
-      expect(result.incremental?.messages).toBeDefined();
-      expect(result.incremental?.states).toBeDefined();
-      expect(result.incremental?.items).toBeDefined();
+      expect(result.incremental).not.toBeNull();
+      expect(result.incremental?.messages).toBeInstanceOf(Array);
+      expect(result.incremental?.states).toBeInstanceOf(Array);
+      expect(result.incremental?.items).toBeInstanceOf(Array);
     });
 
     it('should select mode based on size in hybrid mode', () => {
@@ -443,7 +443,7 @@ describe('ContextService', () => {
         includeAttachments: true,
       });
 
-      expect(result.contextId || result.incremental).toBeDefined();
+      expect(result.contextId !== undefined || result.incremental !== undefined).toBe(true);
     });
 
     it('should throw error for non-existent source context', () => {
@@ -473,7 +473,7 @@ describe('ContextService', () => {
       });
 
       const stats = service.getStats(context.id);
-      expect(stats).toBeDefined();
+      expect(stats).not.toBeNull();
       expect(stats?.messageCount).toBe(1);
       expect(stats?.participantCount).toBe(2);
     });

@@ -662,6 +662,49 @@ describe('UIAgent', () => {
     });
   });
 
+  // Traceability: ST-07 > UIAgent.ts > executeOperation catch block (lines 458-479)
+  describe('executeOperation catch block', () => {
+    it('should handle error when sandbox recordOperation throws', async () => {
+      const agent = new UIAgent();
+      await agent.start();
+      agent.setPermissionLevel('L4');
+      agent.startSession();
+
+      const mockHandler = {
+        getType: () => 'click' as UIOperationType,
+        supports: (op: UIOperationType) => op === 'click',
+        execute: async () => ({
+          success: true,
+          operationId: 'op-ok',
+          type: 'click' as UIOperationType,
+          status: 'success' as UIOperationStatus,
+          executionTime: 5,
+          timestamp: Date.now(),
+        }),
+        validate: () => [],
+      };
+      agent.registerOperationHandler(mockHandler);
+
+      // Make sandbox.recordOperation throw to trigger catch block
+      const sandbox = (agent as any).sandbox;
+      const originalRecordOp = sandbox.recordOperation;
+      sandbox.recordOperation = vi.fn().mockImplementation(() => {
+        throw new Error('Sandbox record error');
+      });
+
+      const result = await agent.execute({
+        type: 'click',
+        input: { selector: '#btn' },
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Sandbox record error');
+      expect(result.status).toBe('failed');
+
+      sandbox.recordOperation = originalRecordOp;
+    });
+  });
+
   // Traceability: ST-07 > UIAgent.ts > stop() ends all active sessions
   describe('stop ends all active sessions', () => {
     it('should end all active sessions on stop', async () => {

@@ -114,10 +114,10 @@ describe('CoreConversationPlugin', () => {
         const result = await plugin.execute(createPluginInput('create_session'));
 
         expect(result.success).toBe(true);
-        expect(result.data).toBeDefined();
+        expect(result.data).not.toBeNull();
         const data = result.data as ConversationResult;
         expect(data.type).toBe('session');
-        expect(data.session).toBeDefined();
+        expect(data.session).not.toBeNull();
         expect(data.session!.id).toMatch(/^sess_/);
       });
 
@@ -128,7 +128,7 @@ describe('CoreConversationPlugin', () => {
 
         expect(result.success).toBe(true);
         const data = result.data as ConversationResult;
-        expect(data.session!.metadata).toBeDefined();
+        expect(data.session!.metadata).not.toBeNull();
       });
 
       it('should set active session after creation', async () => {
@@ -157,7 +157,7 @@ describe('CoreConversationPlugin', () => {
         expect(result.success).toBe(true);
         const data = result.data as ConversationResult;
         expect(data.type).toBe('message');
-        expect(data.message).toBeDefined();
+        expect(data.message).not.toBeNull();
       });
 
       it('should fail without active session', async () => {
@@ -336,7 +336,7 @@ describe('CoreConversationPlugin', () => {
         expect(result.success).toBe(true);
         const data = result.data as ConversationResult;
         expect(data.type).toBe('context');
-        expect(data.contextWindow).toBeDefined();
+        expect(data.contextWindow).not.toBeNull();
       });
 
       it('should get context for specific session', async () => {
@@ -454,7 +454,7 @@ describe('CoreConversationPlugin', () => {
         expect(metadata.id).toBe('core-conversation');
         expect(metadata.name).toBe('core-conversation');
         expect(metadata.version).toBe('1.0.0');
-        expect(metadata.description).toBeDefined();
+        expect(typeof metadata.description).toBe('string');
       });
     });
 
@@ -462,9 +462,13 @@ describe('CoreConversationPlugin', () => {
       it('should return configuration schema', () => {
         const schema = plugin.getConfigSchema();
 
-        expect(schema.maxSessionHistory).toBeDefined();
-        expect(schema.defaultTimeout).toBeDefined();
-        expect(schema.enableStreaming).toBeDefined();
+        expect(typeof schema.maxSessionHistory).toBe('object');
+        expect(schema.maxSessionHistory.type).toBe('number');
+        expect(schema.maxSessionHistory.default).toBe(100);
+        expect(typeof schema.defaultTimeout).toBe('object');
+        expect(schema.defaultTimeout.type).toBe('number');
+        expect(typeof schema.enableStreaming).toBe('object');
+        expect(schema.enableStreaming.type).toBe('boolean');
       });
     });
 
@@ -501,9 +505,9 @@ describe('CoreConversationPlugin', () => {
         const data = result.data as ConversationResult;
         const formatted = plugin.formatOutput(data);
 
-        expect(formatted.text).toBeDefined();
-        expect(formatted.format).toBeDefined();
-        expect(formatted.metadata).toBeDefined();
+        expect(typeof formatted.text).toBe('string');
+        expect(typeof formatted.format).toBe('string');
+        expect(formatted.metadata).not.toBeNull();
       });
     });
 
@@ -511,8 +515,8 @@ describe('CoreConversationPlugin', () => {
       it('should return session manager instance', () => {
         const manager = plugin.getSessionManager();
 
-        expect(manager).toBeDefined();
-        expect(manager.getActiveCount).toBeDefined();
+        expect(manager).not.toBeNull();
+        expect(typeof manager.getActiveCount).toBe('function');
       });
     });
 
@@ -520,8 +524,8 @@ describe('CoreConversationPlugin', () => {
       it('should return context manager instance', () => {
         const manager = plugin.getContextManager();
 
-        expect(manager).toBeDefined();
-        expect(manager.getContextCount).toBeDefined();
+        expect(manager).not.toBeNull();
+        expect(typeof manager.getContextCount).toBe('function');
       });
     });
   });

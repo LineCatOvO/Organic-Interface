@@ -26,10 +26,10 @@ describe('StorageService', () => {
       const result = await storage.create('test', { name: 'test' });
 
       expect(result.success).toBe(true);
-      expect(result.entity).toBeDefined();
+      expect(result.entity).not.toBeNull();
       expect(result.entity?.type).toBe('test');
       expect(result.entity?.data.name).toBe('test');
-      expect(result.entity?.id).toBeDefined();
+      expect(typeof result.entity?.id).toBe('string');
     });
 
     it('should create entity with custom ID', async () => {
@@ -53,7 +53,7 @@ describe('StorageService', () => {
       const created = await storage.create('test', { name: 'test' });
       const entity = await storage.read(created.entity!.id);
 
-      expect(entity).toBeDefined();
+      expect(entity).not.toBeNull();
       expect(entity?.id).toBe(created.entity?.id);
       expect(entity?.data.name).toBe('test');
     });
@@ -208,8 +208,8 @@ describe('StorageService', () => {
     it('should begin a transaction', async () => {
       const tx = await storage.beginTransaction();
 
-      expect(tx).toBeDefined();
-      expect(tx.id).toBeDefined();
+      expect(tx).not.toBeNull();
+      expect(typeof tx.id).toBe('string');
       expect(tx.status).toBe('active');
     });
 
@@ -267,7 +267,7 @@ describe('StorageService', () => {
 
       const info = await storage.getStorageInfo();
 
-      expect(info.backend).toBeDefined();
+      expect(info.backend).not.toBeNull();
       expect(info.backend.count).toBe(1);
       expect(info.transactionActive).toBe(false);
     });
@@ -589,7 +589,7 @@ describe('StorageService', () => {
 
       const info = await storage.getStorageInfo();
 
-      expect(info.indexes).toBeDefined();
+      expect(info.indexes).not.toBeNull();
       expect(info.indexes.length).toBe(1);
       expect(info.indexes[0].name).toBe('my-index');
     });
@@ -633,7 +633,7 @@ describe('StorageService', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.entity).toBeDefined();
+      expect(result.entity).not.toBeNull();
       expect((result.entity!.metadata as Record<string, unknown>).author).toBe('test-user');
     });
 
@@ -647,7 +647,7 @@ describe('StorageService', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.entity!.metadata.expires_at).toBeDefined();
+      expect(typeof result.entity!.metadata.expires_at).toBe('number');
     });
   });
 

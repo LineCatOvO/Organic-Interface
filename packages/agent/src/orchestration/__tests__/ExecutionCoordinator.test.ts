@@ -431,9 +431,12 @@ describe('ExecutionCoordinator', () => {
       const metadata = createAgentMetadata('agent-1', 'TestAgent', AgentType.EXECUTOR);
       registry.register(metadata);
 
-      // 创建一个活跃执行
+      // 创建一个会延迟完成的执行
+      let resolveSend: (value: unknown) => void = () => {};
       const mockChannel = {
-        sendAndWait: vi.fn().mockImplementation(() => new Promise(() => {})),
+        sendAndWait: vi.fn().mockImplementation(
+          () => new Promise(resolve => { resolveSend = resolve; })
+        ),
       };
       vi.spyOn((coordinator as any), 'getOrCreateChannel').mockReturnValue(mockChannel);
 
@@ -446,11 +449,12 @@ describe('ExecutionCoordinator', () => {
       await new Promise(resolve => setImmediate(resolve));
 
       // 取消执行
+      expect(coordinator.getActiveCount()).toBe(1);
       const cancelResult = coordinator.cancel(plan.requestId);
       expect(cancelResult).toBe(true);
-      expect(coordinator.getActiveCount()).toBeGreaterThanOrEqual(0);
 
-      // 等待执行完成
+      // 完成挂起的执行以清理
+      resolveSend('cancelled-result');
       await executePromise;
     });
   });

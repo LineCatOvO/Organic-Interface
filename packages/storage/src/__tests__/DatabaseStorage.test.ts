@@ -748,6 +748,97 @@ describe('DatabaseStorage', () => {
       expect(await storage.has('ga-expired-2')).toBe(false);
     });
   });
+
+  describe('ST-04: getByType fallback 过期清理', () => {
+    it('should clean up expired entities in fallback scanning path', async () => {
+      // 覆盖 getByType 中 fallback 扫描路径的过期实体清理（disableIndex 时）
+      const noIdxPath = path.join(os.tmpdir(), `fallback-expired-${Date.now()}`);
+      const noIdxStorage = new DatabaseStorage({
+        dbPath: noIdxPath,
+        enableTypeIndex: false,
+      });
+
+      await noIdxStorage.initialize();
+
+      // 添加有效和过期实体
+      await noIdxStorage.set(createTestEntity('fb-valid', 'cat', { name: 'A' }));
+      const expired = createTestEntity('fb-expired', 'cat', { name: 'B' });
+      expired.metadata.expires_at = Date.now() - 1000;
+      await noIdxStorage.set(expired);
+
+      const cats = await noIdxStorage.getByType('cat');
+
+      // 只应返回有效实体
+      expect(cats).toHaveLength(1);
+      expect(cats[0].id).toBe('fb-valid');
+
+      // 过期实体应被删除
+      expect(await noIdxStorage.has('fb-expired')).toBe(false);
+
+      await noIdxStorage.close();
+      await fs.rm(noIdxPath, { recursive: true, force: true });
+    });
+  });
+
+  describe('ST-04: batchSet 错误处理 catch 块', () => {
+    it('should handle error in batchSet and add to failed list', async () => {
+      // 覆盖 batchSet 内部 catch 块（line 258-263）
+      const originalSet = (storage as any).entities.set;
+      let callCount = 0;
+      (storage as any).entities.set = function (...args: unknown[]) {
+        callCount++;
+        if (callCount === 2) {
+          throw new Error('Mock set error');
+        }
+        return originalSet.apply(this, args);
+      };
+
+      const entities = [
+        createTestEntity('bs-err-1', 'user', { name: 'A' }),
+        createTestEntity('bs-err-2', 'user', { name: 'B' }),
+        createTestEntity('bs-err-3', 'user', { name: 'C' }),
+      ];
+
+      const result = await storage.batchSet(entities);
+
+      expect(result.success).toBe(false);
+      expect(result.processed).toBe(2);
+      expect(result.failed).toHaveLength(1);
+      expect(result.failed[0].id).toBe('bs-err-2');
+      expect(result.failed[0].error).toBe('Mock set error');
+
+      // 恢复
+      (storage as any).entities.set = originalSet;
+    });
+  });
+
+  describe('ST-04: batchDelete 错误处理 catch 块', () => {
+    it('should handle error in batchDelete and add to failed list', async () => {
+      // 覆盖 batchDelete 内部 catch 块（line 334-339）
+      await storage.set(createTestEntity('bd-err-1', 'user', { name: 'A' }));
+      await storage.set(createTestEntity('bd-err-2', 'user', { name: 'B' }));
+
+      const originalDelete = (storage as any).entities.delete;
+      let callCount = 0;
+      (storage as any).entities.delete = function (...args: unknown[]) {
+        callCount++;
+        if (callCount === 2) {
+          throw new Error('Mock delete error');
+        }
+        return originalDelete.apply(this, args);
+      };
+
+      const result = await storage.batchDelete(['bd-err-1', 'bd-err-2']);
+
+      expect(result.processed).toBe(1);
+      expect(result.failed).toHaveLength(1);
+      expect(result.failed[0].id).toBe('bd-err-2');
+      expect(result.failed[0].error).toBe('Mock delete error');
+
+      // 恢复
+      (storage as any).entities.delete = originalDelete;
+    });
+  });
 });
 
 function createTestEntity(id: string, type: string, data: Record<string, unknown>): StorageEntity {
