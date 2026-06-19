@@ -462,15 +462,17 @@ describe('ContextWindowManager', () => {
 
     describe('token estimation - edge cases', () => {
       it('should handle messages with empty content', () => {
-        const messages = [{
-          id: 'empty-msg',
-          sender: { id: 'user-1', type: 'user' as const, name: 'User' },
-          content: { text: '', format: ContentFormat.PLAIN_TEXT },
-          type: MessageType.USER_MESSAGE,
-          timestamp: Date.now(),
-          status: MessageStatus.SENT,
-          flags: [],
-        }];
+        const messages = [
+          {
+            id: 'empty-msg',
+            sender: { id: 'user-1', type: 'user' as const, name: 'User' },
+            content: { text: '', format: ContentFormat.PLAIN_TEXT },
+            type: MessageType.USER_MESSAGE,
+            timestamp: Date.now(),
+            status: MessageStatus.SENT,
+            flags: [],
+          },
+        ];
 
         const window = manager.createWindow('ctx-empty-content', messages);
         expect(window.tokenCount).toBeGreaterThan(0);

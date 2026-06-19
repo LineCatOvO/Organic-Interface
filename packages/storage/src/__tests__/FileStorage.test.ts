@@ -429,4 +429,207 @@ describe('FileStorage', () => {
       await fs.rm(emptyBasePath, { recursive: true, force: true });
     });
   });
+
+  describe('flush - delete entity files', () => {
+    it('should delete file when entity was removed from cache during flush', async () => {
+      // Create and store an entity
+      await storage.set(createTestEntity('flush-delete-test', 'user', { name: 'FlushDelete' }));
+
+      // Close storage to trigger flush (which writes the file)
+      await storage.close();
+
+      // Verify file exists after first flush
+      const filePath = path.join(basePath, 'entities', 'flush-delete-test.json');
+      const fileExistsBefore = await fs
+        .access(filePath)
+        .then(() => true)
+        .catch(() => false);
+      expect(fileExistsBefore).toBe(true);
+
+      // Re-initialize and delete the entity
+      await storage.initialize();
+      await storage.delete('flush-delete-test');
+
+      // Close again to trigger flush (which should delete the file this time)
+      await storage.close();
+
+      // Verify file no longer exists after second flush
+      const fileExistsAfter = await fs
+        .access(filePath)
+        .then(() => true)
+        .catch(() => false);
+      expect(fileExistsAfter).toBe(false);
+
+      // Re-initialize for cleanup in afterEach
+      await storage.initialize();
+    });
+  });
+
+  describe('delete without autoFlush', () => {
+    it('should delete file immediately when autoFlush is disabled', async () => {
+      const noFlushStorage = new FileStorage({ basePath, autoFlush: false });
+      await noFlushStorage.initialize();
+
+      await noFlushStorage.set(
+        createTestEntity('delete-noflush-test', 'user', { name: 'NoFlush' })
+      );
+
+      const filePath = path.join(basePath, 'entities', 'delete-noflush-test.json');
+      const fileExistsBefore = await fs
+        .access(filePath)
+        .then(() => true)
+        .catch(() => false);
+      expect(fileExistsBefore).toBe(true);
+
+      // Delete should immediately remove the file in non-autoFlush mode
+      await noFlushStorage.delete('delete-noflush-test');
+
+      const fileExistsAfter = await fs
+        .access(filePath)
+        .then(() => true)
+        .catch(() => false);
+      expect(fileExistsAfter).toBe(false);
+
+      await noFlushStorage.close();
+    });
+
+    it('should handle deleting non-existent file gracefully in non-autoFlush mode', async () => {
+      const noFlushStorage = new FileStorage({ basePath, autoFlush: false });
+      await noFlushStorage.initialize();
+
+      // Try to delete an entity that was never saved to disk
+      const result = await noFlushStorage.delete('non-existent-noflush');
+      expect(result).toBe(false);
+
+      await noFlushStorage.close();
+    });
+  });
+
+  describe('getByType with expired entities', () => {
+    it('should exclude expired entities from type query results', async () => {
+      await storage.set(createTestEntity('valid-type', 'product', { name: 'ValidProduct' }));
+
+      const expired = createTestEntity('expired-type', 'product', { name: 'ExpiredProduct' });
+      expired.metadata.expires_at = Date.now() - 1000; // Already expired
+      await storage.set(expired);
+
+      const products = await storage.getByType('product');
+
+      expect(products.length).toBe(1);
+      expect(products[0].id).toBe('valid-type');
+      expect(products[0].data.name).toBe('ValidProduct');
+    });
+  });
+
+  describe('query - time-based filters', () => {
+    beforeEach(async () => {
+      const now = Date.now();
+      const oldEntity = createTestEntity('old-entity', 'user', { name: 'Old' });
+      oldEntity.created_at = now - 100000; // Created 100 seconds ago
+      oldEntity.updated_at = now - 50000; // Updated 50 seconds ago
+      await storage.set(oldEntity);
+
+      const newEntity = createTestEntity('new-entity', 'user', { name: 'New' });
+      newEntity.created_at = now - 1000; // Created 1 second ago
+      newEntity.updated_at = now - 500; // Updated 0.5 seconds ago
+      await storage.set(newEntity);
+    });
+
+    it('should filter by created_after', async () => {
+      const threshold = Date.now() - 50000;
+      const result = await storage.query({ created_after: threshold });
+
+      expect(result.length).toBe(1);
+      expect(result[0].id).toBe('new-entity');
+    });
+
+    it('should filter by created_before', async () => {
+      const threshold = Date.now() - 50000;
+      const result = await storage.query({ created_before: threshold });
+
+      expect(result.length).toBe(1);
+      expect(result[0].id).toBe('old-entity');
+    });
+
+    it('should filter by updated_after', async () => {
+      const threshold = Date.now() - 10000;
+      const result = await storage.query({ updated_after: threshold });
+
+      expect(result.length).toBe(1);
+      expect(result[0].id).toBe('new-entity');
+    });
+
+    it('should filter by updated_before', async () => {
+      const threshold = Date.now() - 10000;
+      const result = await storage.query({ updated_before: threshold });
+
+      expect(result.length).toBe(1);
+      expect(result[0].id).toBe('old-entity');
+    });
+  });
+
+  describe('query - generic field matching', () => {
+    beforeEach(async () => {
+      await storage.set(createTestEntity('generic-1', 'user', { name: 'Generic1' }));
+      await storage.set(createTestEntity('generic-2', 'product', { name: 'Generic2' }));
+    });
+
+    it('should match against top-level entity fields', async () => {
+      const result = await storage.query({ version: 1 });
+
+      // All test entities have version: 1
+      expect(result.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('autoFlush configuration', () => {
+    it('should disable autoFlush when explicitly set to false', () => {
+      const manualFlushStorage = new FileStorage({
+        basePath: '/tmp/test-manual',
+        autoFlush: false,
+      });
+      expect((manualFlushStorage as any).autoFlush).toBe(false);
+    });
+
+    it('should not start flush timer when autoFlush is disabled', async () => {
+      const manualFlushStorage = new FileStorage({ basePath, autoFlush: false });
+      await manualFlushStorage.initialize();
+
+      // Timer should not be started
+      expect((manualFlushStorage as any).flushTimer).toBeUndefined();
+
+      await manualFlushStorage.close();
+    });
+  });
+
+  describe('entity data isolation', () => {
+    it('should return independent copy of top-level data properties', async () => {
+      const entity = createTestEntity('isolation-test', 'config', {
+        name: 'TestConfig',
+        enabled: true,
+      });
+      await storage.set(entity);
+
+      // Modify original object reference after setting
+      entity.data.name = 'Modified';
+      entity.data.enabled = false;
+
+      // Get should return unmodified copy of top-level properties
+      const retrieved = await storage.get('isolation-test');
+      expect(retrieved?.data.name).toBe('TestConfig');
+      expect(retrieved?.data.enabled).toBe(true);
+    });
+
+    it('should return independent copies from getAll for top-level properties', async () => {
+      await storage.set(createTestEntity('all-copy-1', 'test', { value: 'first' }));
+      await storage.set(createTestEntity('all-copy-2', 'test', { value: 'second' }));
+
+      const entities = await storage.getAll();
+      entities[0].data.value = 'modified';
+
+      // Original should not be affected (top-level property isolation)
+      const entities2 = await storage.getAll();
+      expect(entities2[0].data.value).toBe('first');
+    });
+  });
 });
