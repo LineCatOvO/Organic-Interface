@@ -368,6 +368,129 @@ describe('ContextWindowManager', () => {
 
       expect(handler).toHaveBeenCalled();
     });
+
+    // ========== 补充测试用例 ==========
+
+    describe('createWindow - edge cases', () => {
+      it('should handle empty messages array', () => {
+        const window = manager.createWindow('ctx-empty', []);
+
+        expect(window).toBeDefined();
+        expect(window.messages).toEqual([]);
+        expect(window.tokenCount).toBe(0);
+        expect(window.hasNext).toBe(false);
+        expect(window.hasPrevious).toBe(false);
+      });
+
+      it('should create window with RECENT_MINUTES type', () => {
+        const now = Date.now();
+        const messages = [
+          ...createTestMessages(5),
+          {
+            id: 'old-msg',
+            sender: { id: 'user-1', type: 'user' as const, name: 'User' },
+            content: { text: 'Old message', format: ContentFormat.PLAIN_TEXT },
+            type: MessageType.USER_MESSAGE,
+            timestamp: now - 60 * 60 * 1000,
+            status: MessageStatus.SENT,
+            flags: [],
+          },
+        ];
+
+        const window = manager.createWindow('ctx-time', messages, {
+          windowType: ContextWindowType.RECENT_MINUTES,
+          timeWindowMinutes: 30,
+        });
+
+        const hasOldMessage = window.messages.some(m => m.id === 'old-msg');
+        expect(hasOldMessage).toBe(false);
+        expect(window.messages.length).toBe(5);
+      });
+
+      it('should create window with TOKEN_BASED type', () => {
+        const messages = createTestMessages(50);
+        const window = manager.createWindow('ctx-token', messages, {
+          windowType: ContextWindowType.TOKEN_BASED,
+          windowSize: 10,
+          maxTokens: 100,
+        });
+
+        expect(window).toBeDefined();
+        expect(window.messages.length).toBeLessThanOrEqual(10);
+      });
+    });
+
+    describe('slideForward - detailed behavior', () => {
+      it('should update hasPrevious and hasNext correctly', () => {
+        const messages = createTestMessages(100);
+        const window = manager.createWindow('ctx-1', messages, { windowSize: 20, overlapSize: 5 });
+
+        expect(window.hasPrevious).toBe(false);
+        expect(window.hasNext).toBe(true);
+
+        const slid = manager.slideForward(window.id, messages);
+        expect(slid?.hasPrevious).toBe(true);
+      });
+    });
+
+    describe('optimizeWindow - edge cases', () => {
+      it('should return same window when maxTokens is undefined', () => {
+        const messages = createTestMessages(20);
+        const window = manager.createWindow('ctx-1', messages, { maxTokens: undefined });
+        window.config.maxTokens = undefined;
+
+        const optimized = manager.optimizeWindow(window.id);
+        expect(optimized).toBe(window);
+      });
+    });
+
+    describe('window management - cleanup', () => {
+      it('should auto-cleanup old windows when exceeding limit', () => {
+        const limitedManager = new ContextWindowManager({ maxWindowsPerContext: 3 });
+        const messages = createTestMessages(10);
+
+        limitedManager.createWindow('ctx-1', messages);
+        limitedManager.createWindow('ctx-1', messages);
+        limitedManager.createWindow('ctx-1', messages);
+        const w4 = limitedManager.createWindow('ctx-1', messages);
+
+        const windows = limitedManager.getWindowsForContext('ctx-1');
+        expect(windows.length).toBeLessThanOrEqual(3);
+        expect(limitedManager.getWindow(w4.id)).not.toBeNull();
+      });
+    });
+
+    describe('token estimation - edge cases', () => {
+      it('should handle messages with empty content', () => {
+        const messages = [{
+          id: 'empty-msg',
+          sender: { id: 'user-1', type: 'user' as const, name: 'User' },
+          content: { text: '', format: ContentFormat.PLAIN_TEXT },
+          type: MessageType.USER_MESSAGE,
+          timestamp: Date.now(),
+          status: MessageStatus.SENT,
+          flags: [],
+        }];
+
+        const window = manager.createWindow('ctx-empty-content', messages);
+        expect(window.tokenCount).toBeGreaterThan(0);
+      });
+    });
+
+    describe('window properties validation', () => {
+      it('should generate unique window IDs', () => {
+        const messages = createTestMessages(10);
+        const w1 = manager.createWindow('ctx-1', messages);
+        const w2 = manager.createWindow('ctx-2', messages);
+        expect(w1.id).not.toBe(w2.id);
+      });
+
+      it('should include items array in window', () => {
+        const messages = createTestMessages(10);
+        const window = manager.createWindow('ctx-items', messages);
+        expect(Array.isArray(window.items)).toBe(true);
+      });
+    });
   });
 });
 

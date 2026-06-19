@@ -3,7 +3,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { StorageService, StorageError, StorageErrorCode } from '../services/StorageService.js';
+import {
+  StorageService,
+  StorageError,
+  StorageErrorCode,
+  IsolationLevel,
+} from '../services/StorageService.js';
 import { MemoryStorage } from '../backends/MemoryStorage.js';
 import { IndexType } from '../models/index.js';
 
@@ -519,16 +524,20 @@ describe('StorageService', () => {
   });
 
   describe('close with active transaction', () => {
-    it('should rollback active transaction on close', async () => {
-      await storage.beginTransaction();
+    it('should rollback active transaction on close without error', async () => {
+      // Use a separate instance to avoid afterEach interference
+      const closeTestBackend = new MemoryStorage();
+      const closeTestStorage = new StorageService(closeTestBackend);
+      await closeTestStorage.initialize();
 
-      expect(storage.getCurrentTransaction()).not.toBeNull();
+      await closeTestStorage.beginTransaction();
+      expect(closeTestStorage.getCurrentTransaction()).not.toBeNull();
 
-      await storage.close();
+      // Close should rollback the transaction without throwing
+      await expect(closeTestStorage.close()).resolves.not.toThrow();
 
       // After close, currentTransaction should be null (rolled back)
-      // Note: close is also called in afterEach, so we need to re-check
-      expect(storage.getCurrentTransaction()).toBeNull();
+      expect(closeTestStorage.getCurrentTransaction()).toBeNull();
     });
   });
 
@@ -690,6 +699,318 @@ describe('StorageService', () => {
         expect(error.code).toBe(code);
         expect(error.name).toBe('StorageError');
       }
+    });
+
+    it('should include details in error', () => {
+      const details = { field: 'id', value: 'test-id' };
+      const error = new StorageError('test error', StorageErrorCode.ENTITY_NOT_FOUND, details);
+
+      expect(error.details).toEqual(details);
+    });
+  });
+
+  // ========== 补充测试：异常处理路径 ==========
+
+  describe('create - error handling', () => {
+    it('should handle backend.set() errors gracefully', async () => {
+      // Create a mock backend that throws on set
+      const failingBackend = new MemoryStorage();
+      const failingStorage = new StorageService(failingBackend);
+      await failingStorage.initialize();
+
+      // Mock the set method to throw
+      failingBackend.set = async () => {
+        throw new Error('Database connection failed');
+      };
+
+      const result = await failingStorage.create('test', { name: 'error-case' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Database connection failed');
+      expect(result.entity).toBeUndefined();
+
+      await failingStorage.close();
+    });
+  });
+
+  describe('update - error handling', () => {
+    it('should handle backend.get() errors gracefully', async () => {
+      const failingBackend = new MemoryStorage();
+      const failingStorage = new StorageService(failingBackend);
+      await failingStorage.initialize();
+
+      // Mock get to throw
+      failingBackend.get = async () => {
+        throw new Error('Connection lost');
+      };
+
+      const result = await failingStorage.update('some-id', { name: 'updated' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Connection lost');
+
+      await failingStorage.close();
+    });
+  });
+
+  describe('delete - error handling', () => {
+    it('should handle backend.delete() errors gracefully', async () => {
+      const failingBackend = new MemoryStorage();
+      const failingStorage = new StorageService(failingBackend);
+      await failingStorage.initialize();
+
+      // Mock delete to throw
+      failingBackend.delete = async () => {
+        throw new Error('Delete operation failed');
+      };
+
+      const result = await failingStorage.delete('some-id');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Delete operation failed');
+
+      await failingStorage.close();
+    });
+  });
+
+  describe('query - error handling', () => {
+    it('should handle backend.query() errors gracefully', async () => {
+      const failingBackend = new MemoryStorage();
+      const failingStorage = new StorageService(failingBackend);
+      await failingStorage.initialize();
+
+      // Mock query to throw
+      failingBackend.query = async () => {
+        throw new Error('Query parsing failed');
+      };
+
+      const result = await failingStorage.query({ where: { type: 'test' } });
+
+      expect(result.success).toBe(false);
+      expect(result.entities).toEqual([]);
+      expect(result.total).toBe(0);
+      expect(result.error).toContain('Query parsing failed');
+
+      await failingStorage.close();
+    });
+  });
+
+  describe('clearExpired - edge cases', () => {
+    it('should return success with 0 cleared when no expired entities exist', async () => {
+      // Create only non-expired entities
+      await storage.create(
+        'test',
+        { name: 'valid-entity' },
+        { metadata: { expires_at: Date.now() + 999999 } }
+      );
+
+      const result = await storage.clearExpired();
+
+      expect(result.success).toBe(true);
+      expect(result.cleared).toBe(0);
+    });
+
+    it('should handle getAll() errors gracefully', async () => {
+      const failingBackend = new MemoryStorage();
+      const failingStorage = new StorageService(failingBackend);
+      await failingStorage.initialize();
+
+      // Mock getAll to throw
+      failingBackend.getAll = async () => {
+        throw new Error('Cannot list entities');
+      };
+
+      const result = await failingStorage.clearExpired();
+
+      expect(result.success).toBe(false);
+      expect(result.cleared).toBe(0);
+      expect(result.error).toContain('Cannot list entities');
+
+      await failingStorage.close();
+    });
+  });
+
+  describe('getStorageInfo - with active transaction', () => {
+    it('should show transactionActive as true when transaction is active', async () => {
+      await storage.beginTransaction();
+
+      const info = await storage.getStorageInfo();
+
+      expect(info.transactionActive).toBe(true);
+
+      await storage.rollbackTransaction();
+    });
+  });
+
+  describe('unique index constraint violation', () => {
+    it('should reject entity creation when unique index constraint is violated', async () => {
+      // Register a unique index on data.email
+      storage.registerIndex({
+        name: 'unique-email',
+        type: IndexType.UNIQUE,
+        fields: ['data.email'],
+        unique: true,
+      });
+
+      // Create first entity with email
+      const result1 = await storage.create('user', { email: 'test@example.com' });
+      expect(result1.success).toBe(true);
+
+      // Try to create second entity with same email (unique constraint violation)
+      const result2 = await storage.create('user', { email: 'test@example.com' });
+
+      expect(result2.success).toBe(false);
+      expect(result2.error).toContain('Unique constraint violation');
+    });
+  });
+
+  describe('transaction options', () => {
+    it('should use default READ_COMMITTED isolation level', async () => {
+      const tx = await storage.beginTransaction();
+
+      expect(tx.isolation).toBe(IsolationLevel.READ_COMMITTED);
+
+      await storage.rollbackTransaction();
+    });
+
+    it('should use custom isolation level when specified', async () => {
+      const tx = await storage.beginTransaction({
+        isolation: IsolationLevel.SERIALIZABLE,
+      });
+
+      expect(tx.isolation).toBe(IsolationLevel.SERIALIZABLE);
+
+      await storage.rollbackTransaction();
+    });
+
+    it('should include startTime in transaction', async () => {
+      const beforeStart = Date.now();
+      const tx = await storage.beginTransaction();
+
+      expect(tx.startTime).toBeGreaterThanOrEqual(beforeStart);
+      expect(tx.startTime).toBeLessThanOrEqual(Date.now());
+
+      await storage.rollbackTransaction();
+    });
+  });
+
+  describe('orderBy - null/undefined field values', () => {
+    beforeEach(async () => {
+      await storage.batchCreate([
+        { type: 'item', data: { name: null, order: 1 } },
+        { type: 'item', data: { name: 'B', order: 2 } },
+        { type: 'item', data: { name: undefined, order: 3 } },
+        { type: 'item', data: { name: 'A', order: 4 } },
+      ]);
+    });
+
+    it('should sort with null/undefined values at beginning (asc)', async () => {
+      const result = await storage.query({
+        where: { type: 'item' },
+        orderBy: [{ field: 'data.name', direction: 'asc' }],
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.entities.length).toBe(4);
+      // null and undefined should come first in asc order (both treated as null-ish)
+      const firstName = result.entities[0].data.name;
+      expect(firstName === null || firstName === undefined).toBe(true);
+    });
+
+    it('should sort with null/undefined values at end (desc)', async () => {
+      const result = await storage.query({
+        where: { type: 'item' },
+        orderBy: [{ field: 'data.name', direction: 'desc' }],
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.entities.length).toBe(4);
+      // null and undefined should go to end in desc order
+      const lastName = result.entities[result.entities.length - 1].data.name;
+      expect(lastName === null || lastName === undefined).toBe(true);
+    });
+  });
+
+  describe('filterFields - combined include and exclude', () => {
+    beforeEach(async () => {
+      await storage.create('user', {
+        name: 'Alice',
+        age: 25,
+        email: 'alice@test.com',
+        phone: '123456',
+      });
+    });
+
+    it('should apply both include and exclude filters', async () => {
+      const result = await storage.query({
+        where: { type: 'user' },
+        include: ['data.name', 'data.age'],
+        exclude: ['data.email'],
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.entities[0].data.name).toBe('Alice');
+      // When both include and exclude are specified, exclude overwrites with filtered original data
+      // So we get original data minus excluded fields
+      expect(result.entities[0].data.email).toBeUndefined();
+      // Other fields from original data remain (phone was not excluded)
+      expect(result.entities[0].data.phone).toBeDefined();
+    });
+  });
+
+  describe('query - total count accuracy', () => {
+    it('should report total before pagination is applied', async () => {
+      await storage.batchCreate([
+        { type: 'item', data: { value: 1 } },
+        { type: 'item', data: { value: 2 } },
+        { type: 'item', data: { value: 3 } },
+        { type: 'item', data: { value: 4 } },
+        { type: 'item', data: { value: 5 } },
+      ]);
+
+      const result = await storage.query({
+        where: { type: 'item' },
+        limit: 2,
+        offset: 0,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.entities.length).toBe(2); // Limited to 2
+      expect(result.total).toBe(5); // Total is 5 before limit
+    });
+  });
+
+  describe('create - entity without ID option', () => {
+    it('should auto-generate ID when not specified', async () => {
+      const result = await storage.create('auto', { data: 'value' });
+
+      expect(result.success).toBe(true);
+      expect(result.entity).not.toBeNull();
+      expect(result.entity!.id).toBeDefined();
+      expect(typeof result.entity!.id).toBe('string');
+      expect(result.entity!.id.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('read after delete', () => {
+    it('should return null after entity is deleted', async () => {
+      const created = await storage.create('temp', { data: 'to-delete' });
+      await storage.delete(created.entity!.id);
+
+      const read = await storage.read(created.entity!.id);
+      expect(read).toBeNull();
+    });
+  });
+
+  describe('update returns version', () => {
+    it('should increment version number on each update', async () => {
+      const created = await storage.create('versioned', { value: 1 });
+
+      const update1 = await storage.update(created.entity!.id, { value: 2 });
+      expect(update1.version).toBe(2);
+
+      const update2 = await storage.update(created.entity!.id, { value: 3 });
+      expect(update2.version).toBe(3);
     });
   });
 });
