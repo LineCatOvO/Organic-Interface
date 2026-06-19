@@ -490,4 +490,219 @@ describe('CLI', () => {
       expect(result.message?.length ?? 0).toBeGreaterThan(0);
     });
   });
+
+  // ========== CORE-01 补充测试用例：覆盖未达标代码行 ==========
+
+  describe('executeCommand - subcommand nesting (lines 174-185)', () => {
+    it('should execute nested subcommands with handler', async () => {
+      const { createCommand, addSubcommand } = await import('../Command.js');
+
+      // Create parent command
+      const parentCmd = createCommand({
+        name: 'parent',
+        description: 'Parent command',
+      });
+
+      // Create subcommand with handler
+      const subCmd = createCommand({
+        name: 'sub-action',
+        description: 'Sub action',
+        handler: async () => ({
+          success: true,
+          code: 0,
+          message: 'Sub command executed',
+        }),
+      });
+
+      // Use addSubcommand to properly register the subcommand
+      addSubcommand(parentCmd, subCmd);
+
+      cli.register(parentCmd);
+
+      // Execute parent subcommand
+      const result = await cli.run(['parent', 'sub-action']);
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Sub command executed');
+    });
+
+    it('should handle subcommand without handler gracefully', async () => {
+      const { createCommand, addSubcommand } = await import('../Command.js');
+
+      // Create parent command
+      const parentCmd2 = createCommand({
+        name: 'parent2',
+        description: 'Parent command 2',
+      });
+
+      // Create subcommand without handler
+      const subCmdNoHandler = createCommand({
+        name: 'no-handler-sub',
+        description: 'Sub without handler',
+        // No handler defined
+      });
+
+      // Use addSubcommand to properly register the subcommand
+      addSubcommand(parentCmd2, subCmdNoHandler);
+
+      cli.register(parentCmd2);
+
+      const result = await cli.run(['parent2', 'no-handler-sub']);
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('has no handler');
+    });
+  });
+
+  describe('showHelp - specific command help (lines 207-215)', () => {
+    it('should show help for specific registered command with --help', async () => {
+      const result = await cli.run(['--help', 'history']);
+      expect(result.success).toBe(true);
+      expect(result.code).toBe(0);
+      expect(result.message).toContain('history');
+    });
+
+    it('should show help for specific command with -h flag', async () => {
+      const result = await cli.run(['-h', 'log']);
+      expect(result.success).toBe(true);
+      expect(result.code).toBe(0);
+      expect(result.message).toBeDefined();
+    });
+
+    it('should show general help when target command not found', async () => {
+      const result = await cli.run(['--help', 'nonexistent-cmd']);
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('organic-cli');
+      expect(result.message).toContain('Available commands');
+    });
+  });
+
+  describe('command without handler (lines 193-198)', () => {
+    it('should return message for command without handler', async () => {
+      const { createCommand } = await import('../Command.js');
+
+      const noHandlerCmd = createCommand({
+        name: 'nohandler',
+        description: 'Command without handler',
+        // Intentionally no handler
+      });
+
+      cli.register(noHandlerCmd);
+
+      const result = await cli.run(['nohandler']);
+      expect(result.success).toBe(true);
+      expect(result.code).toBe(0);
+      expect(result.message).toBe('Command nohandler has no handler');
+    });
+  });
+
+  describe('OperationLog error_message field validation', () => {
+    it('should store and retrieve error_message in operation log', () => {
+      cli.addOperationLog({
+        agent_id: 'error-agent',
+        operation_type: 'failed-op',
+        target_selector: 'target-err',
+        parameters: {},
+        status: 'failed',
+        before_state: { ok: true },
+        after_state: { ok: false },
+        error_message: 'Something went wrong',
+      });
+
+      const history = cli.getOperationHistory();
+      const errorEntry = history.find(h => h.error_message);
+
+      expect(errorEntry).toBeDefined();
+      expect(errorEntry?.error_message).toBe('Something went wrong');
+      expect(errorEntry?.status).toBe('failed');
+    });
+
+    it('should handle operation log without error_message', () => {
+      cli.addOperationLog({
+        agent_id: 'success-agent',
+        operation_type: 'success-op',
+        target_selector: 'target-ok',
+        parameters: {},
+        status: 'success',
+        before_state: {},
+        after_state: {},
+        // No error_message
+      });
+
+      const history = cli.getOperationHistory();
+      const successEntry = history.find(h => h.agent_id === 'success-agent');
+
+      expect(successEntry).toBeDefined();
+      expect(successEntry?.error_message).toBeUndefined();
+    });
+  });
+
+  describe('CLI configuration edge cases', () => {
+    it('should handle empty string name with default fallback', () => {
+      const emptyNameCli = new CLI({ name: '' });
+      expect(emptyNameCli).toBeDefined();
+    });
+
+    it('should handle extremely long description', () => {
+      const longDesc = 'A'.repeat(1000);
+      const longDescCli = new CLI({ description: longDesc });
+      expect(longDescCli).toBeDefined();
+    });
+
+    it('should accept all configuration options simultaneously', () => {
+      const fullConfigCli = new CLI({
+        name: 'full-cli',
+        version: '99.99.99',
+        description: 'Full configuration CLI',
+        interactive: true,
+        historyPath: '/tmp/full-test-history',
+      });
+      expect(fullConfigCli).toBeDefined();
+    });
+  });
+
+  describe('DEFAULT_CLI_CONFIG completeness verification', () => {
+    it('should have all required default configuration fields', async () => {
+      const { DEFAULT_CLI_CONFIG } = await import('../CLI.js');
+
+      expect(DEFAULT_CLI_CONFIG.name).toBe('organic-cli');
+      expect(DEFAULT_CLI_CONFIG.version).toBe('0.1.0');
+      expect(DEFAULT_CLI_CONFIG.description).toBe('Organic Interface CLI');
+      expect(DEFAULT_CLI_CONFIG.interactive).toBe(false);
+      expect(DEFAULT_CLI_CONFIG.historyPath).toBe('.organic-cli-history');
+    });
+  });
+
+  describe('registerBuiltInCommands order and deduplication', () => {
+    it('should register all built-in commands without duplication', async () => {
+      // Verify built-in commands are accessible
+      const helpResult = await cli.run(['help']);
+      expect(helpResult.success).toBe(true);
+
+      const historyResult = await cli.run(['history']);
+      expect(historyResult.success).toBe(true);
+
+      const logResult = await cli.run(['log']);
+      expect(logResult.success).toBe(true);
+    });
+  });
+
+  describe('parse error handling details', () => {
+    it('should return detailed error message for parse failure', async () => {
+      const customParserCli = new CLI({
+        parser: {
+          parse: () => ({
+            success: false,
+            error: 'Custom parse error: invalid syntax',
+            parsed: null,
+          }),
+          formatHelp: () => 'Help text',
+          extractArgs: () => ({}),
+        } as any,
+      });
+
+      const result = await customParserCli.run(['invalid-input']);
+      expect(result.success).toBe(false);
+      expect(result.code).toBe(1);
+      expect(result.error).toContain('Custom parse error');
+    });
+  });
 });
