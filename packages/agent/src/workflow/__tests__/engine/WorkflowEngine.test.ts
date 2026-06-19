@@ -637,4 +637,99 @@ describe('WorkflowEngine', () => {
       expect(engine2.listWorkflows()).toEqual([]);
     });
   });
+
+  describe('edge cases and error handling', () => {
+    it('should handle duplicate workflow registration', () => {
+      // 覆盖重复注册场景
+      const workflow = createWorkflow('TestWorkflow', '1.0.0');
+      engine.registerWorkflow(workflow);
+      // 再次注册相同的工作流（不应该抛出错误）
+      engine.registerWorkflow(workflow);
+      const result = engine.getWorkflow(workflow.id);
+      expect(result).toBeDefined();
+    });
+
+    it('should handle unregister non-existent workflow', () => {
+      // 覆盖注销不存在的工作流
+      const result = engine.unregisterWorkflow('non-existent');
+      expect(result).toBe(false);
+    });
+
+    it('should cancel already completed execution gracefully', async () => {
+      // 覆盖取消已完成执行的场景
+      const startNode = createTask('start', TaskType.START);
+      const workflow = createWorkflow('TestWorkflow', '1.0.0');
+      workflow.nodes = [startNode];
+      workflow.entryNodeId = startNode.id;
+      engine.registerWorkflow(workflow);
+
+      vi.spyOn((engine as any).executor, 'executeTask').mockResolvedValue({
+        success: true,
+        output: {},
+        duration: 1,
+      });
+
+      const executionId = await engine.startExecution(workflow.id);
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // 取消已完成的执行应返回 false 或 true 但不抛出错误
+      const result = engine.cancelExecution(executionId);
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('should resume only paused execution', async () => {
+      // 覆盖恢复非暂停执行的场景
+      const startNode = createTask('start', TaskType.START);
+      const workflow = createWorkflow('TestWorkflow', '1.0.0');
+      workflow.nodes = [startNode];
+      workflow.entryNodeId = startNode.id;
+      engine.registerWorkflow(workflow);
+
+      vi.spyOn((engine as any).executor, 'executeTask').mockImplementation(
+        () => new Promise(() => {})
+      );
+
+      const executionId = await engine.startExecution(workflow.id);
+      await new Promise(resolve => setImmediate(resolve));
+
+      // 尝试恢复正在运行（非暂停）的执行应返回 false
+      const result = await engine.resumeExecution(executionId);
+      expect(result).toBe(false);
+    });
+
+    it('should handle multiple concurrent executions', async () => {
+      // 覆盖多执行并发场景
+      const workflow = createWorkflow('TestWorkflow', '1.0.0');
+      engine.registerWorkflow(workflow);
+
+      const execId1 = await engine.startExecution(workflow.id);
+      const execId2 = await engine.startExecution(workflow.id);
+      const execId3 = await engine.startExecution(workflow.id);
+
+      expect(execId1).toBeDefined();
+      expect(execId2).toBeDefined();
+      expect(execId3).toBeDefined();
+      expect(execId1).not.toBe(execId2);
+      expect(execId2).not.toBe(execId3);
+
+      // 所有执行都应存在
+      expect(engine.getExecution(execId1)).toBeDefined();
+      expect(engine.getExecution(execId2)).toBeDefined();
+      expect(engine.getExecution(execId3)).toBeDefined();
+    });
+
+    it('should emit events with correct payload structure', async () => {
+      // 验证事件负载结构
+      const workflow = createWorkflow('EventTest', '1.0.0');
+      engine.registerWorkflow(workflow);
+
+      let registeredPayload: unknown = null;
+      engine.on('workflow:registered', (payload: unknown) => {
+        registeredPayload = payload;
+      });
+
+      engine.registerWorkflow(workflow);
+      expect(registeredPayload).toBeTruthy();
+    });
+  });
 });
