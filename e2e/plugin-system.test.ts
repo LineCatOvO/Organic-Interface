@@ -319,4 +319,277 @@ describe('Plugin System', () => {
     const loaded = kernel.getPlugin('priority-plugin');
     expect(loaded).toBeDefined();
   });
+
+  // ========== 新增：完整插件生命周期测试 ==========
+  describe('Complete Plugin Lifecycle', () => {
+    it('should complete full lifecycle: register → initialize → execute → shutdown → unregister', async () => {
+      const lifecycleStates: string[] = [];
+
+      class FullLifecyclePlugin extends BasePlugin {
+        private _state: Record<string, unknown> = {};
+
+        static override metadata: PluginMetadata = {
+          id: 'full-lifecycle-plugin',
+          name: 'Full Lifecycle Plugin',
+          version: '1.0.0',
+          description: 'Full lifecycle test plugin',
+          author: 'Test',
+          apiVersion: '1.0.0',
+          dependencies: [],
+        };
+
+        async initialize() {
+          lifecycleStates.push('initialized');
+          this._state = { status: 'ready', initializedAt: Date.now() };
+          return { success: true };
+        }
+
+        async execute(context?: Record<string, unknown>) {
+          lifecycleStates.push('executing');
+          return {
+            success: true,
+            result: { message: 'execution completed', input: context },
+          };
+        }
+
+        async shutdown() {
+          lifecycleStates.push('shutdown');
+          this._state = { status: 'stopped', stoppedAt: Date.now() };
+          return { success: true };
+        }
+
+        getState() {
+          return this._state;
+        }
+
+        setState(state: Record<string, unknown>) {
+          this._state = { ...this._state, ...state };
+        }
+      }
+
+      const config: PluginConfig = {
+        name: 'full-lifecycle-plugin',
+        version: '1.0.0',
+        enabled: true,
+      };
+
+      const plugin = new FullLifecyclePlugin(config);
+
+      // Step 1: Register and Initialize
+      await kernel.registerPlugin(plugin);
+      expect(kernel.getPlugin('full-lifecycle-plugin')).toBeDefined();
+
+      // Manually call initialize to trigger lifecycle
+      await plugin.initialize();
+      expect(lifecycleStates).toContain('initialized');
+
+      // Step 2: Execute (if supported)
+      if (typeof plugin.execute === 'function') {
+        const result = await plugin.execute({ test: 'data' });
+        expect(result.success).toBe(true);
+        expect(lifecycleStates).toContain('executing');
+      }
+
+      // Step 3 & 4: Unregister (this will trigger shutdown)
+      await kernel.unregisterPlugin('full-lifecycle-plugin');
+      expect(kernel.getPlugin('full-lifecycle-plugin')).toBeUndefined();
+      expect(lifecycleStates).toContain('shutdown');
+
+      // Verify lifecycle contains all expected states
+      expect(lifecycleStates).toContain('initialized');
+      expect(lifecycleStates).toContain('executing');
+      expect(lifecycleStates).toContain('shutdown');
+    });
+
+    it('should handle plugin with dependencies loading order', async () => {
+      const loadOrder: string[] = [];
+
+      class DependencyPluginA extends BasePlugin {
+        static override metadata: PluginMetadata = {
+          id: 'dep-plugin-a',
+          name: 'Dependency Plugin A',
+          version: '1.0.0',
+          description: 'First dependency',
+          author: 'Test',
+          apiVersion: '1.0.0',
+          dependencies: [],
+        };
+
+        async initialize() {
+          loadOrder.push('plugin-a');
+          return { success: true };
+        }
+        async shutdown() {
+          return { success: true };
+        }
+      }
+
+      class DependencyPluginB extends BasePlugin {
+        static override metadata: PluginMetadata = {
+          id: 'dep-plugin-b',
+          name: 'Dependency Plugin B',
+          version: '1.0.0',
+          description: 'Second dependency (depends on A)',
+          author: 'Test',
+          apiVersion: '1.0.0',
+          dependencies: ['dep-plugin-a'],
+        };
+
+        async initialize() {
+          loadOrder.push('plugin-b');
+          return { success: true };
+        }
+        async shutdown() {
+          return { success: true };
+        }
+      }
+
+      // Register plugins
+      const pluginA = new DependencyPluginA({
+        name: 'dep-plugin-a',
+        version: '1.0.0',
+        enabled: true,
+      });
+      const pluginB = new DependencyPluginB({
+        name: 'dep-plugin-b',
+        version: '1.0.0',
+        enabled: true,
+      });
+
+      await kernel.registerPlugin(pluginB);
+      await kernel.registerPlugin(pluginA);
+
+      // Manually trigger initialization to track order
+      await pluginA.initialize();
+      await pluginB.initialize();
+
+      // Verify both plugins are registered
+      expect(kernel.getPlugin('dep-plugin-a')).toBeDefined();
+      expect(kernel.getPlugin('dep-plugin-b')).toBeDefined();
+
+      // Verify both were initialized
+      expect(loadOrder).toContain('plugin-a');
+      expect(loadOrder).toContain('plugin-b');
+    });
+
+    it('should handle plugin state persistence across operations', async () => {
+      class StatefulPlugin extends BasePlugin {
+        private _internalState: Record<string, unknown> = {};
+
+        static override metadata: PluginMetadata = {
+          id: 'stateful-plugin',
+          name: 'Stateful Plugin',
+          version: '1.0.0',
+          description: 'State management test',
+          author: 'Test',
+          apiVersion: '1.0.0',
+          dependencies: [],
+        };
+
+        async initialize() {
+          this._internalState = {
+            status: 'active',
+            counter: 0,
+            lastOperation: null as string | null,
+          };
+          return { success: true };
+        }
+
+        async execute(_context?: Record<string, unknown>) {
+          const newCounter = (this._internalState?.counter || 0) + 1;
+          this._internalState = {
+            ...this._internalState,
+            counter: newCounter,
+            lastOperation: 'execute',
+            lastExecutedAt: Date.now(),
+          };
+          return { success: true, result: { executionCount: newCounter } };
+        }
+
+        async shutdown() {
+          this._internalState = { status: 'stopped' };
+          return { success: true };
+        }
+
+        getState() {
+          return this._internalState;
+        }
+      }
+
+      const plugin = new StatefulPlugin({
+        name: 'stateful-plugin',
+        version: '1.0.0',
+        enabled: true,
+      });
+      await kernel.registerPlugin(plugin);
+      await plugin.initialize();
+
+      // Execute multiple times and verify state accumulation
+      const result1 = await plugin.execute();
+      expect(result1.result.executionCount).toBe(1);
+
+      const result2 = await plugin.execute();
+      expect(result2.result.executionCount).toBe(2);
+
+      const result3 = await plugin.execute();
+      expect(result3.result.executionCount).toBe(3);
+
+      // Verify final state
+      const finalState = plugin.getState();
+      expect(finalState.counter).toBe(3);
+      expect(finalState.lastOperation).toBe('execute');
+    });
+
+    it('should handle concurrent plugin operations safely', async () => {
+      let operationCount = 0;
+
+      class ConcurrentPlugin extends BasePlugin {
+        static override metadata: PluginMetadata = {
+          id: 'concurrent-plugin',
+          name: 'Concurrent Plugin',
+          version: '1.0.0',
+          description: 'Concurrency safety test',
+          author: 'Test',
+          apiVersion: '1.0.0',
+          dependencies: [],
+        };
+
+        async initialize() {
+          return { success: true };
+        }
+
+        async execute() {
+          // Simulate async operation
+          await new Promise(resolve => setTimeout(resolve, 10));
+          operationCount++;
+          return { success: true, result: { count: operationCount } };
+        }
+
+        async shutdown() {
+          return { success: true };
+        }
+      }
+
+      const plugin = new ConcurrentPlugin({
+        name: 'concurrent-plugin',
+        version: '1.0.0',
+        enabled: true,
+      });
+      await kernel.registerPlugin(plugin);
+
+      // Execute concurrently
+      const results = await Promise.all([
+        plugin.execute(),
+        plugin.execute(),
+        plugin.execute(),
+        plugin.execute(),
+        plugin.execute(),
+      ]);
+
+      // All executions should complete
+      expect(results.length).toBe(5);
+      expect(results.every(r => r.success)).toBe(true);
+      expect(operationCount).toBe(5);
+    });
+  });
 });

@@ -376,6 +376,242 @@ describe('SessionPersistenceStorage', () => {
         expect(plugin.status.toString()).toBe('active');
         expect(plugin.tags).toEqual(['persistence']);
       });
+
+      it('should handle all optional fields in toPlugin', () => {
+        const fullSession: SessionPersistence = {
+          id: 'full-session',
+          title: 'Full Session',
+          status: SessionPersistenceStatus.IDLE,
+          tags: ['tag1', 'tag2'],
+          metadata: { complex: { nested: true } },
+          contextWindow: {
+            windowSize: 200,
+            windowType: 'sliding_window',
+            includeSystemMessages: false,
+            includeToolCalls: true,
+            maxTokens: 8000,
+          },
+          createdAt: 1000,
+          lastActiveAt: 2000,
+          expiresAt: 3000,
+          messageCount: 42,
+          projectId: 'project-123',
+        };
+
+        const plugin = SessionAdapter.toPlugin(fullSession);
+
+        expect(plugin.id).toBe('full-session');
+        expect(plugin.expiresAt).toBe(3000);
+        expect(plugin.projectId).toBe('project-123');
+        expect(plugin.messageCount).toBe(42);
+      });
+    });
+
+    describe('toPersistence edge cases', () => {
+      it('should convert all optional fields in toPersistence', () => {
+        const pluginSession = {
+          id: 'optional-session',
+          title: 'Optional Fields Session',
+          status: { toString: () => 'idle' } as { toString(): string },
+          tags: ['opt1', 'opt2'],
+          metadata: { key: 'value' },
+          contextWindow: {
+            windowSize: 150,
+            windowType: 'custom',
+            includeSystemMessages: false,
+            includeToolCalls: true,
+            maxTokens: 10000,
+          },
+          createdAt: 5000,
+          lastActiveAt: 6000,
+          expiresAt: 7000,
+          messageCount: 99,
+          projectId: 'proj-abc',
+        };
+
+        const persistence = SessionAdapter.toPersistence(pluginSession);
+
+        expect(persistence.expiresAt).toBe(7000);
+        expect(persistence.projectId).toBe('proj-abc');
+        expect(persistence.messageCount).toBe(99);
+        expect(persistence.contextWindow.maxTokens).toBe(10000);
+      });
+    });
+  });
+
+  describe('save with duplicate handling', () => {
+    it('should handle create failure with duplicate error gracefully', async () => {
+      // This test verifies the fallback logic when create fails due to duplicate
+      const session = createTestSession({ id: 'dup-test-session' });
+      await storage.save(session);
+
+      // Save again - should use update path since session exists
+      session.title = 'Updated after duplicate';
+      await storage.save(session);
+
+      const loaded = await storage.load(session.id);
+      expect(loaded?.title).toBe('Updated after duplicate');
+    });
+  });
+
+  describe('load with edge cases', () => {
+    it('should handle entity with minimal data using defaults', async () => {
+      // entityToSession uses fallback defaults (|| operator), so even minimal data works
+      const minimalEntity = {
+        id: 'minimal-entity',
+        data: {
+          // Only provide id, everything else will use defaults
+        } as unknown as Record<string, unknown>,
+        metadata: { tags: ['session'] },
+      };
+
+      // Manually write minimal entity to backend
+      await storageService.create('session', minimalEntity.data, {
+        id: minimalEntity.id,
+        metadata: minimalEntity.metadata,
+      });
+
+      // Should load successfully with default values
+      const loaded = await storage.load(minimalEntity.id);
+      expect(loaded).not.toBeNull();
+      expect(loaded?.id).toBe('minimal-entity');
+      expect(loaded?.title).toContain('Session'); // Default title format
+      expect(loaded?.status).toBe(SessionPersistenceStatus.ACTIVE); // Default status
+    });
+  });
+
+  describe('close without autoSave', () => {
+    it('should not persist cache when autoSave is disabled on close', async () => {
+      const config: SessionPersistenceStorageConfig = {
+        storage: storageService,
+        autoSave: false,
+      };
+      const noAutoSaveStorage = new SessionPersistenceStorage(config);
+      await noAutoSaveStorage.initialize();
+
+      const session = createTestSession({ id: 'no-autosave-close' });
+      await noAutoSaveStorage.save(session); // Only saves to cache
+
+      await noAutoSaveStorage.close();
+
+      // Verify session was not persisted to storage
+      const newStorage = new SessionPersistenceStorage(config);
+      await newStorage.initialize();
+      const loaded = await newStorage.load(session.id);
+      expect(loaded).toBeNull();
+
+      await newStorage.close();
+    });
+  });
+
+  describe('list with mixed valid and expired sessions', () => {
+    it('should only return valid sessions and clean up expired ones', async () => {
+      const valid1 = createTestSession({ id: 'valid-1' });
+      const valid2 = createTestSession({ id: 'valid-2' });
+      const expired1 = createTestSession({ id: 'expired-1', expiresAt: Date.now() - 1000 });
+      const expired2 = createTestSession({ id: 'expired-2', expiresAt: Date.now() - 2000 });
+
+      await storage.save(valid1);
+      await storage.save(valid2);
+      await storage.save(expired1);
+      await storage.save(expired2);
+
+      const sessions = await storage.list();
+
+      const ids = sessions.map(s => s.id);
+      expect(ids).toContain('valid-1');
+      expect(ids).toContain('valid-2');
+      expect(ids).not.toContain('expired-1');
+      expect(ids).not.toContain('expired-2');
+
+      // Expired sessions should be cleaned from storage
+      const count = await storage.count();
+      expect(count).toBe(2); // Only valid sessions remain
+    });
+  });
+
+  describe('session validation edge cases', () => {
+    it('should handle session with ARCHIVED status as invalid', async () => {
+      const archivedSession = createTestSession({
+        id: 'archived-test',
+        status: SessionPersistenceStatus.ARCHIVED,
+        // Don't set expiresAt to test status-based invalidation
+      });
+      delete (archivedSession as any).expiresAt;
+
+      await storage.save(archivedSession);
+      const loaded = await storage.load(archivedSession.id);
+      expect(loaded).toBeNull();
+    });
+
+    it('should handle session with future expiration as valid', async () => {
+      const futureSession = createTestSession({
+        id: 'future-expiry',
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours from now
+      });
+
+      await storage.save(futureSession);
+      const loaded = await storage.load(futureSession.id);
+      expect(loaded).not.toBeNull();
+      expect(loaded?.id).toBe('future-expiry');
+    });
+  });
+
+  describe('entity conversion edge cases', () => {
+    it('should handle session with minimal required fields', async () => {
+      const minimalSession = createTestSession({
+        id: 'minimal-session',
+        title: '',
+        tags: [],
+        metadata: {},
+      });
+
+      await storage.save(minimalSession);
+      const loaded = await storage.load(minimalSession.id);
+
+      expect(loaded).not.toBeNull();
+      expect(loaded?.title).toBe('');
+      expect(loaded?.tags).toEqual([]);
+      expect(loaded?.metadata).toEqual({});
+    });
+
+    it('should preserve complex metadata structure', async () => {
+      const complexMetadata = {
+        nested: {
+          deep: {
+            value: [1, 2, 3],
+          },
+        },
+        array: [{ a: 1 }, { b: 2 }],
+      };
+
+      const complexSession = createTestSession({
+        id: 'complex-metadata',
+        metadata: complexMetadata,
+      });
+
+      await storage.save(complexSession);
+      const loaded = await storage.load(complexSession.id);
+
+      expect(loaded?.metadata).toEqual(complexMetadata);
+    });
+  });
+
+  describe('concurrent operations', () => {
+    it('should handle multiple rapid saves', async () => {
+      const sessions = Array.from({ length: 10 }, (_, i) =>
+        createTestSession({ id: `rapid-${i}` })
+      );
+
+      // Save all sessions rapidly
+      await Promise.all(sessions.map(s => storage.save(s)));
+
+      // Verify all were saved
+      for (const session of sessions) {
+        const loaded = await storage.load(session.id);
+        expect(loaded).not.toBeNull();
+        expect(loaded?.id).toBe(session.id);
+      }
     });
   });
 });

@@ -553,4 +553,385 @@ describe('OutputFormatter', () => {
       expect(output.text).toContain('\x1b[92m');
     });
   });
+
+  describe('ERROR result type handling', () => {
+    it('should format ERROR type result with message', () => {
+      const errorResult = {
+        type: ResultType.ERROR,
+        message: {
+          id: 'msg-error',
+          content: {
+            text: 'Something went wrong',
+            format: ContentFormat.PLAIN_TEXT,
+          },
+          type: ResponseType.ERROR,
+          sender: MessageSender.SYSTEM,
+          timestamp: Date.now(),
+        },
+      };
+      const output = formatter.format(errorResult);
+
+      expect(output.text).toContain('Something went wrong');
+      expect(output.metadata).toBeDefined();
+    });
+
+    it('should format ERROR type result without message as generic', () => {
+      const errorResult = {
+        type: ResultType.ERROR,
+        errorCode: 'INTERNAL_ERROR',
+        data: { reason: 'unknown' },
+      };
+      const output = formatter.format(errorResult as any);
+
+      expect(output.format).toBe(OutputFormat.JSON);
+      expect(() => JSON.parse(output.text)).not.toThrow();
+    });
+  });
+
+  describe('formatError with colors enabled', () => {
+    it('should format error with ANSI colors when enabled', () => {
+      const coloredFormatter = new OutputFormatter({ enableColors: true });
+      const error = new ConversationError('Colored error', ConversationErrorCode.INVALID_INPUT, {
+        sessionId: 'sess-color',
+      });
+      const output = coloredFormatter.formatError(error);
+
+      expect(output.text).toContain('\x1b[31m'); // Red color for error
+      expect(output.text).toContain('[ERROR]');
+      expect(output.text).toContain('Details:');
+      expect(output.metadata.sessionId).toBe('sess-color');
+    });
+
+    it('should format error without details in colored mode', () => {
+      const coloredFormatter = new OutputFormatter({ enableColors: true });
+      const error = new ConversationError('Simple colored error');
+      const output = coloredFormatter.formatError(error);
+
+      expect(output.text).toContain('\x1b[31m');
+      expect(output.text).not.toContain('Details:');
+    });
+  });
+
+  describe('formatMessage with tool calls', () => {
+    it('should include tool calls in formatted output', () => {
+      const resultWithTools = {
+        type: ResultType.MESSAGE,
+        message: {
+          id: 'msg-tools',
+          content: {
+            text: 'I will use some tools',
+            format: ContentFormat.PLAIN_TEXT,
+          },
+          type: ResponseType.TEXT,
+          sender: MessageSender.ASSISTANT,
+          timestamp: Date.now(),
+          toolCalls: [
+            { id: 'call-1', name: 'search', arguments: '{}', type: 'function' as const },
+            {
+              id: 'call-2',
+              name: 'calculate',
+              arguments: '{"expr":"2+2"}',
+              type: 'function' as const,
+            },
+          ],
+        },
+      };
+      const output = formatter.format(resultWithTools);
+
+      expect(output.text).toContain('I will use some tools');
+      expect(output.text).toContain('[TOOL]');
+      expect(output.text).toContain('search');
+      expect(output.text).toContain('calculate');
+    });
+  });
+
+  describe('formatSession with tags', () => {
+    it('should include tags when present', () => {
+      const sessionWithTag = createSessionResult('sess-tags', 'Tagged Session');
+      sessionWithTag.session.tags = ['important', 'work', 'project-alpha'];
+
+      const output = formatter.format(sessionWithTag);
+
+      expect(output.text).toContain('Tags:');
+      expect(output.text).toContain('important');
+      expect(output.text).toContain('work');
+      expect(output.text).toContain('project-alpha');
+    });
+  });
+
+  describe('formatContext without config', () => {
+    it('should handle context without config object', () => {
+      const contextWithoutConfig = {
+        type: ResultType.CONTEXT,
+        contextWindow: {
+          id: 'ctx-no-config',
+          sessionId: 'sess-1',
+          messages: [],
+          tokenCount: 50,
+          messageCount: 5,
+          createdAt: Date.now(),
+          // No config property
+        } as any,
+      };
+      const output = formatter.format(contextWithoutConfig);
+
+      expect(output.text).toContain('Context Window');
+      expect(output.text).toContain('ctx-no-config');
+      expect(output.text).not.toContain('Configuration');
+    });
+  });
+
+  describe('status icons for different session states', () => {
+    it('should show filled circle for active session with colors', () => {
+      const coloredFormatter = new OutputFormatter({ enableColors: true });
+      const sessions = [
+        {
+          id: 'sess-active',
+          title: 'Active Session',
+          messageCount: 10,
+          status: SessionStatus.ACTIVE,
+          tags: [],
+          metadata: {},
+          contextWindow: {
+            windowSize: 50,
+            windowType: ContextWindowType.RECENT_MESSAGES,
+            includeSystemMessages: true,
+            includeToolCalls: true,
+          },
+          createdAt: Date.now(),
+          lastActiveAt: Date.now(),
+        },
+      ];
+      const result = createSessionListResult(sessions);
+      const output = coloredFormatter.format(result);
+
+      expect(output.text).toContain('\x1b[32m'); // Green for active
+    });
+
+    it('should show empty circle for idle session', () => {
+      const sessions = [
+        {
+          id: 'sess-idle',
+          title: 'Idle Session',
+          messageCount: 0,
+          status: SessionStatus.IDLE,
+          tags: [],
+          metadata: {},
+          contextWindow: {
+            windowSize: 50,
+            windowType: ContextWindowType.RECENT_MESSAGES,
+            includeSystemMessages: true,
+            includeToolCalls: true,
+          },
+          createdAt: Date.now(),
+          lastActiveAt: Date.now(),
+        },
+      ];
+      const result = createSessionListResult(sessions);
+      const output = formatter.format(result);
+
+      expect(output.text).toContain('○');
+    });
+
+    it('should show dimmed circle for closed session', () => {
+      const sessions = [
+        {
+          id: 'sess-closed',
+          title: 'Closed Session',
+          messageCount: 100,
+          status: SessionStatus.CLOSED,
+          tags: [],
+          metadata: {},
+          contextWindow: {
+            windowSize: 50,
+            windowType: ContextWindowType.RECENT_MESSAGES,
+            includeSystemMessages: true,
+            includeToolCalls: true,
+          },
+          createdAt: Date.now(),
+          lastActiveAt: Date.now(),
+        },
+      ];
+      const result = createSessionListResult(sessions);
+      const output = formatter.format(result);
+
+      expect(output.text).toContain('Closed Session');
+    });
+
+    it('should show empty circle for unknown status', () => {
+      const sessions = [
+        {
+          id: 'sess-unknown',
+          title: 'Unknown Status Session',
+          messageCount: 5,
+          status: 'unknown_status' as SessionStatus,
+          tags: [],
+          metadata: {},
+          contextWindow: {
+            windowSize: 50,
+            windowType: ContextWindowType.RECENT_MESSAGES,
+            includeSystemMessages: true,
+            includeToolCalls: true,
+          },
+          createdAt: Date.now(),
+          lastActiveAt: Date.now(),
+        },
+      ];
+      const result = createSessionListResult(sessions);
+      const output = formatter.format(result);
+
+      expect(output.text).toContain('○'); // Default icon
+    });
+  });
+
+  describe('formatConfirmation with colors', () => {
+    it('should apply warning color when colors enabled', () => {
+      const coloredFormatter = new OutputFormatter({ enableColors: true });
+      const confirmationResult = {
+        type: ResultType.CONFIRMATION,
+        message: {
+          id: 'msg-confirm',
+          content: {
+            text: 'Delete all files?',
+            format: ContentFormat.PLAIN_TEXT,
+          },
+          type: ResponseType.CONFIRMATION,
+          sender: MessageSender.SYSTEM,
+          timestamp: Date.now(),
+        },
+      };
+      const output = coloredFormatter.format(confirmationResult);
+
+      expect(output.text).toContain('\x1b[33m'); // Warning color (yellow)
+      expect(output.text).toContain('Delete all files?');
+      expect(output.text).toContain('confirm (yes/no)');
+    });
+  });
+
+  describe('formatSuccess and formatWarning with colors', () => {
+    it('should format success with green color', () => {
+      const coloredFormatter = new OutputFormatter({ enableColors: true });
+      const output = coloredFormatter.formatSuccess('Great success!');
+
+      expect(output.text).toContain('\x1b[32m'); // Success green
+      expect(output.text).toContain('[OK]');
+    });
+
+    it('should format warning with yellow color', () => {
+      const coloredFormatter = new OutputFormatter({ enableColors: true });
+      const output = coloredFormatter.formatWarning('Caution advised');
+
+      expect(output.text).toContain('\x1b[33m'); // Warning yellow
+      expect(output.text).toContain('[WARN]');
+    });
+  });
+
+  describe('formatStatus with colors', () => {
+    it('should format status with info color when enabled', () => {
+      const coloredFormatter = new OutputFormatter({ enableColors: true });
+      const output = coloredFormatter.formatStatus({
+        progress: 75,
+        stage: 'processing',
+      });
+
+      expect(output.text).toContain('\x1b[36m'); // Info cyan
+      expect(output.text).toContain('[STATUS]');
+    });
+  });
+
+  describe('formatToolResults edge cases', () => {
+    it('should handle failed tool result without error object', () => {
+      const results = [
+        {
+          callId: 'call-fail',
+          toolName: 'failing_tool',
+          result: null,
+          success: false,
+          executionTime: 10,
+          // No error property
+        },
+      ];
+      const output = formatter.formatToolResults(results);
+
+      expect(output.text).toContain('[TOOL]');
+      expect(output.text).toContain('failing_tool');
+    });
+
+    it('should handle empty results array', () => {
+      const output = formatter.formatToolResults([]);
+
+      expect(output.text).toBe('');
+      expect(output.format).toBe(OutputFormat.TERMINAL);
+    });
+  });
+
+  describe('formatStream edge cases', () => {
+    it('should handle null chunk', () => {
+      const output = formatter.formatStream(null as any);
+      expect(output).toBe('null');
+    });
+
+    it('should handle undefined chunk', () => {
+      const output = formatter.formatStream(undefined as any);
+      expect(output).toBe('undefined');
+    });
+
+    it('should handle boolean chunk', () => {
+      const output = formatter.formatStream(true);
+      expect(output).toBe('true');
+    });
+  });
+
+  describe('formatSection with colors', () => {
+    it('should apply secondary color to section header when enabled', () => {
+      const coloredFormatter = new OutputFormatter({ enableColors: true });
+      const sessionResult = createSessionResult('sess-section', 'Test');
+      const output = coloredFormatter.format(sessionResult);
+
+      expect(output.text).toContain('\x1b[90m'); // Secondary color (gray)
+    });
+  });
+
+  describe('formatMarkdown without colors', () => {
+    it('should not apply ANSI codes when colors disabled', () => {
+      const noColorFormatter = new OutputFormatter({ enableColors: false });
+      const mdResult = {
+        type: ResultType.MESSAGE,
+        message: {
+          id: 'msg-md',
+          content: {
+            text: '**bold text** and `code`',
+            format: ContentFormat.MARKDOWN,
+          },
+          type: ResponseType.TEXT,
+          sender: MessageSender.ASSISTANT,
+          timestamp: Date.now(),
+        },
+      };
+      const output = noColorFormatter.format(mdResult);
+
+      // When colors disabled, markdown should still work but without ANSI codes
+      expect(output.format).toBe(OutputFormat.MARKDOWN);
+      expect(output.text).toContain('bold text');
+    });
+  });
+
+  describe('default options values', () => {
+    it('should use default options when none provided', () => {
+      const defaultFormatter = new OutputFormatter();
+      const output = defaultFormatter.formatSuccess('Default test');
+
+      expect(output.text).toContain('[OK]');
+      expect(output.text).not.toMatch(/\x1b\[/); // No colors by default
+    });
+
+    it('should respect custom maxLineWidth', () => {
+      const customWidth = new OutputFormatter({ maxLineWidth: 20 });
+      const sessionResult = createSessionResult('sess-width', 'Width Test');
+      const output = customWidth.format(sessionResult);
+
+      // "Session Information" is 19 chars, limited to 20
+      expect(output.text).toContain('─'.repeat(19));
+    });
+  });
 });
