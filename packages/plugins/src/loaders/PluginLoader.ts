@@ -451,100 +451,142 @@ export class PluginLoader implements PluginLoaderInterface {
     return {
       getConfig: () => ({}) as KernelConfig,
       getVersion: () => '0.1.0',
-      text: {
-        print: () => {},
-        println: () => {},
-        formatTable: () => '',
-        formatList: () => '',
-        formatSection: () => '',
-        styled: (text: string) => text,
-        success: (text: string) => text,
-        error: (text: string) => text,
-        warning: (text: string) => text,
-        info: (text: string) => text,
-        createStream: () => ({}),
-        progress: () => '',
-        spinner: () => ({}),
-      } as TextServiceInterface,
-      info: {
-        getConfig: () => undefined,
-        getAllConfigs: () => ({}),
-        getRuntimeInfo: () => ({}),
-        getProjectContext: () => ({}),
-        getProjectRoot: () => '',
-        getProjectName: () => '',
-        getProjectVersion: () => '',
-        getSystemInfo: () => ({}),
-        getPlatformInfo: () => ({}),
-        getEnv: () => undefined,
-        getAllEnvs: () => ({}),
-      } as InfoServiceInterface,
+      text: this.createTextServiceStub(),
+      info: this.createInfoServiceStub(),
       registerPlugin: async () => {},
       unregisterPlugin: async () => {},
       getPlugin: (name: string) => this.cache.get(name)?.plugin,
       listPlugins: () => Array.from(this.cache.values()).map(e => e.plugin),
-      executeTool: async (name: string, params: Record<string, unknown>): Promise<ToolResult> => {
-        const startTime = Date.now();
-        const requestId = `req_${startTime}_${Math.random().toString(36).slice(2, 8)}`;
-
-        try {
-          // 遍历已加载的插件查找工具（与 Kernel.executeTool 行为一致）
-          for (const entry of this.cache.values()) {
-            const result = await entry.plugin.execute({
-              action: 'executeTool',
-              params: { name, params, requestId },
-            });
-
-            if (result.success && result.data) {
-              const endTime = Date.now();
-              return {
-                success: true,
-                data: result.data,
-                metadata: {
-                  tool_name: name,
-                  start_time: startTime,
-                  end_time: endTime,
-                  execution_time: endTime - startTime,
-                  request_id: requestId,
-                },
-              };
-            }
-          }
-
-          // 工具未找到
-          const endTime = Date.now();
-          return {
-            success: false,
-            error: {
-              code: ToolErrorCode.TOOL_NOT_FOUND,
-              message: `Tool ${name} not found`,
-            },
-            metadata: {
-              tool_name: name,
-              start_time: startTime,
-              end_time: endTime,
-              execution_time: endTime - startTime,
-              request_id: requestId,
-            },
-          };
-        } catch (error) {
-          const endTime = Date.now();
-          return {
-            success: false,
-            error: {
-              code: ToolErrorCode.EXECUTION_ERROR,
-              message: error instanceof Error ? error.message : String(error),
-            },
-            metadata: {
-              tool_name: name,
-              start_time: startTime,
-              end_time: endTime,
-              execution_time: endTime - startTime,
-              request_id: requestId,
-            },
-          };
-        }
-      },
+      executeTool: this.createExecuteToolHandler(),
     } as KernelApi;
+  }
+
+  /**
+   * Create a stub TextServiceInterface for plugin text operations
+   */
+  private createTextServiceStub(): TextServiceInterface {
+    return {
+      print: () => {},
+      println: () => {},
+      formatTable: () => '',
+      formatList: () => '',
+      formatSection: () => '',
+      styled: (text: string) => text,
+      success: (text: string) => text,
+      error: (text: string) => text,
+      warning: (text: string) => text,
+      info: (text: string) => text,
+      createStream: () => ({}),
+      progress: () => '',
+      spinner: () => ({}),
+    };
+  }
+
+  /**
+   * Create a stub InfoServiceInterface for plugin info queries
+   */
+  private createInfoServiceStub(): InfoServiceInterface {
+    return {
+      getConfig: () => undefined,
+      getAllConfigs: () => ({}),
+      getRuntimeInfo: () => ({}),
+      getProjectContext: () => ({}),
+      getProjectRoot: () => '',
+      getProjectName: () => '',
+      getProjectVersion: () => '',
+      getSystemInfo: () => ({}),
+      getPlatformInfo: () => ({}),
+      getEnv: () => undefined,
+      getAllEnvs: () => ({}),
+    };
+  }
+
+  /**
+   * Create executeTool handler that delegates to loaded plugins
+   */
+  private createExecuteToolHandler(): (
+    name: string,
+    params: Record<string, unknown>
+  ) => Promise<ToolResult> {
+    return async (name: string, params: Record<string, unknown>): Promise<ToolResult> => {
+      const startTime = Date.now();
+      const requestId = `req_${startTime}_${Math.random().toString(36).slice(2, 8)}`;
+
+      try {
+        for (const entry of this.cache.values()) {
+          const result = await entry.plugin.execute({
+            action: 'executeTool',
+            params: { name, params, requestId },
+          });
+
+          if (result.success && result.data) {
+            return this.buildToolSuccessResult(name, startTime, requestId, result.data);
+          }
+        }
+
+        return this.buildToolErrorResult(
+          name,
+          startTime,
+          requestId,
+          ToolErrorCode.TOOL_NOT_FOUND,
+          `Tool ${name} not found`
+        );
+      } catch (error) {
+        return this.buildToolErrorResult(
+          name,
+          startTime,
+          requestId,
+          ToolErrorCode.EXECUTION_ERROR,
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    };
+  }
+
+  /**
+   * Build successful tool execution result
+   */
+  private buildToolSuccessResult(
+    toolName: string,
+    startTime: number,
+    requestId: string,
+    data: unknown
+  ): ToolResult {
+    const endTime = Date.now();
+    return {
+      success: true,
+      data,
+      metadata: {
+        tool_name: toolName,
+        start_time: startTime,
+        end_time: endTime,
+        execution_time: endTime - startTime,
+        request_id: requestId,
+      },
+    };
+  }
+
+  /**
+   * Build error tool execution result
+   */
+  private buildToolErrorResult(
+    toolName: string,
+    startTime: number,
+    requestId: string,
+    code: ToolErrorCode,
+    message: string
+  ): ToolResult {
+    const endTime = Date.now();
+    return {
+      success: false,
+      error: { code, message },
+      metadata: {
+        tool_name: toolName,
+        start_time: startTime,
+        end_time: endTime,
+        execution_time: endTime - startTime,
+        request_id: requestId,
+      },
+    };
   }
 }
