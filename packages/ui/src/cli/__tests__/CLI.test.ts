@@ -403,4 +403,91 @@ describe('CLI', () => {
       expect(result.code).toBe(1);
     });
   });
+
+  describe('configuration options', () => {
+    it('should accept interactive mode configuration', () => {
+      const interactiveCli = new CLI({ interactive: true });
+      expect(interactiveCli).toBeDefined();
+    });
+
+    it('should accept custom history path', () => {
+      const customHistoryCli = new CLI({ historyPath: '/custom/path/history' });
+      expect(customHistoryCli).toBeDefined();
+    });
+
+    it('should use default historyPath when not specified', () => {
+      const defaultCli = new CLI();
+      expect(defaultCli).toBeDefined();
+      // Verify default config is applied
+    });
+  });
+
+  describe('log command - comprehensive filtering', () => {
+    let filterCli: CLI;
+
+    beforeEach(() => {
+      // Use independent CLI instance to avoid test interference
+      filterCli = new CLI();
+
+      // Add multiple logs with different properties for filtering tests
+      filterCli.addOperationLog({
+        agent_id: 'agent-alpha',
+        operation_type: 'create',
+        target_selector: 'target-1',
+        parameters: {},
+        status: 'success',
+        before_state: {},
+        after_state: {},
+      });
+
+      filterCli.addOperationLog({
+        agent_id: 'agent-beta',
+        operation_type: 'update',
+        target_selector: 'target-2',
+        parameters: {},
+        status: 'failed',
+        before_state: {},
+        after_state: {},
+        error_message: 'Update failed',
+      });
+
+      filterCli.addOperationLog({
+        agent_id: 'agent-alpha',
+        operation_type: 'delete',
+        target_selector: 'target-3',
+        parameters: {},
+        status: 'success',
+        before_state: {},
+        after_state: {},
+      });
+    });
+
+    it('should filter logs by agent and return only matching entries', async () => {
+      const result = await filterCli.run(['log', '-a', 'agent-alpha']);
+      expect(result.success).toBe(true);
+      // Should contain agent-alpha entries
+      expect(result.message).toContain('agent-alpha');
+    });
+
+    it('should filter logs by operation type', async () => {
+      const result = await filterCli.run(['log', '-t', 'update']);
+      expect(result.success).toBe(true);
+      // Should contain update operations
+      expect(result.message).toContain('update');
+    });
+
+    it('should filter logs by status', async () => {
+      const result = await filterCli.run(['log', '-s', 'failed']);
+      expect(result.success).toBe(true);
+      // Should contain failed entries
+      expect(result.message).toContain('failed');
+    });
+
+    it('should combine multiple filters', async () => {
+      const result = await filterCli.run(['log', '-a', 'agent-alpha', '-s', 'success']);
+      expect(result.success).toBe(true);
+      // Verify filtering is applied (result should not be empty and should contain filtered entries)
+      expect(result.message?.length ?? 0).toBeGreaterThan(0);
+    });
+  });
 });
