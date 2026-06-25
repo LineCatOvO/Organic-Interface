@@ -45,6 +45,8 @@ export interface WorkflowEngineConfig extends WorkflowExecutorConfig {
   snapshotInterval?: number;
   /** Continue on error */
   continueOnError?: boolean;
+  /** Per-node execution timeout in ms (0 disables) */
+  nodeTimeout?: number;
 }
 
 /**
@@ -60,6 +62,7 @@ export const DEFAULT_WORKFLOW_ENGINE_CONFIG: Required<WorkflowEngineConfig> = {
   enableRecovery: true,
   snapshotInterval: 30000,
   continueOnError: false,
+  nodeTimeout: 0,
 };
 
 /**
@@ -419,13 +422,29 @@ export class WorkflowEngine extends EventEmitter {
     );
 
     try {
-      // Execute the task
-      const result = await this.executor.executeTask(
+      // Execute the task with optional per-node timeout
+      const execPromise = this.executor.executeTask(
         task,
         taskExecution,
         execution.input,
         execution.context
       );
+
+      const result = this.config.nodeTimeout
+        ? await Promise.race([
+            execPromise,
+            new Promise<{ success: false; error: { code: string; message: string }; duration: number }>(
+              resolve => setTimeout(
+                () => resolve({
+                  success: false,
+                  error: { code: 'WF_004', message: `Node '${task.id}' timed out` },
+                  duration: this.config.nodeTimeout,
+                }),
+                this.config.nodeTimeout
+              )
+            ),
+          ])
+        : await execPromise;
 
       // Process result
       await this.processNodeResult(executionId, workflow, task, result);

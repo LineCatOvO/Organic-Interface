@@ -129,6 +129,21 @@ export class ShellTool implements Tool {
     return this.definition;
   }
 
+  /** Blocklisted dangerous commands */
+  private static readonly BLOCKLISTED_COMMANDS = new Set([
+    'sudo',
+    'su',
+    'chown',
+    'chmod',
+    'passwd',
+    'mkfs',
+    'dd',
+    'fdisk',
+    'reboot',
+    'shutdown',
+    'init',
+  ]);
+
   validate(input: unknown): ToolValidationError[] {
     const errors: ToolValidationError[] = [];
     const data = input as Partial<ShellToolInput>;
@@ -138,6 +153,13 @@ export class ShellTool implements Tool {
         path: 'command',
         message: 'Command is required',
         expected: 'string',
+        actual: data.command,
+      });
+    } else if (ShellTool.BLOCKLISTED_COMMANDS.has(data.command.trim().split(/\s+/)[0]!)) {
+      errors.push({
+        path: 'command',
+        message: `Command '${data.command.trim().split(/\s+/)[0]}' is not permitted for security reasons`,
+        expected: 'safe command',
         actual: data.command,
       });
     }

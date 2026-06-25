@@ -141,6 +141,81 @@ describe('ShellTool', () => {
     });
   });
 
+  describe('security: command injection protection', () => {
+    it('should block dangerous commands like sudo', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'sudo rm -rf /' });
+      expect(errors.some(e => e.path === 'command')).toBe(true);
+      expect(errors[0]?.message).toContain('not permitted');
+    });
+
+    it('should block su command', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'su root' });
+      expect(errors.some(e => e.path === 'command')).toBe(true);
+    });
+
+    it('should block chmod command', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'chmod 777 /etc/passwd' });
+      expect(errors.some(e => e.path === 'command')).toBe(true);
+    });
+
+    it('should block chown command', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'chown root:root /etc/shadow' });
+      expect(errors.some(e => e.path === 'command')).toBe(true);
+    });
+
+    it('should block reboot command', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'reboot' });
+      expect(errors.some(e => e.path === 'command')).toBe(true);
+    });
+
+    it('should block shutdown command', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'shutdown -h now' });
+      expect(errors.some(e => e.path === 'command')).toBe(true);
+    });
+
+    it('should block dd command', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'dd if=/dev/zero of=/dev/sda' });
+      expect(errors.some(e => e.path === 'command')).toBe(true);
+    });
+
+    it('should block mkfs command', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'mkfs /dev/sda1' });
+      expect(errors.some(e => e.path === 'command')).toBe(true);
+    });
+
+    it('should block fdisk command', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'fdisk /dev/sda' });
+      expect(errors.some(e => e.path === 'command')).toBe(true);
+    });
+
+    it('should allow safe commands like echo', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'echo hello' });
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should allow ls command', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'ls -la /tmp' });
+      expect(errors).toHaveLength(0);
+    });
+
+    it('should allow git command', () => {
+      const tool = new ShellTool();
+      const errors = tool.validate({ command: 'git status' });
+      expect(errors).toHaveLength(0);
+    });
+  });
+
   describe('createShellTool', () => {
     it('should create ShellTool instance', () => {
       const instance = createShellTool();
