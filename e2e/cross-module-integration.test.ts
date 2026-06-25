@@ -129,10 +129,10 @@ describe('Cross-Module Integration', () => {
       const { EventBus } = await import('../packages/kernel/src/kernel/EventBus.ts');
 
       const eventBus = new EventBus();
-      let eventReceived = false;
+      const _eventReceived: boolean[] = [];
 
       eventBus.on('test-event', () => {
-        eventReceived = true;
+        _eventReceived.push(true);
       });
 
       eventBus.emit('test-event', { data: 'test' });

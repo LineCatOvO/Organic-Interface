@@ -281,7 +281,7 @@ describe('Agent Session Persistence', () => {
 
       // All operations should complete without error
       // Some operations may return undefined (e.g., save operations)
-      results.forEach(result => {
+      results.forEach(_result => {
         // Results can be session objects or undefined for write operations
         expect(true).toBe(true); // Operation completed without throwing
       });
