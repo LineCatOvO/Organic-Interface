@@ -934,4 +934,53 @@ describe('OutputFormatter', () => {
       expect(output.text).toContain('─'.repeat(19));
     });
   });
+
+  describe('formatToolResults with enableColors - error branch', () => {
+    it('should show error message with colors when tool result has error', () => {
+      // 可追溯性: 覆盖 OutputFormatter.ts L297-307 enableColors + error 分支
+      const coloredFormatter = new OutputFormatter({ enableColors: true });
+      const results = [
+        {
+          callId: 'call-1',
+          toolName: 'test_tool',
+          success: false,
+          result: {},
+          error: { code: 'ERR_01', message: 'Tool failed' },
+          executionTime: 15,
+        },
+      ];
+      const output = coloredFormatter.formatToolResults(results);
+
+      expect(output.text).toContain('[TOOL]');
+      expect(output.text).toContain('Error');
+      expect(output.text).toContain('Tool failed');
+    });
+  });
+
+  describe('formatMessage with timestamps and colors', () => {
+    it('should add colored timestamp when both options enabled', () => {
+      // 可追溯性: 覆盖 OutputFormatter.ts L349-354 includeTimestamps + enableColors 分支
+      const coloredFormatter = new OutputFormatter({
+        enableColors: true,
+        includeTimestamps: true,
+      });
+      const messageResult = {
+        type: ResultType.MESSAGE,
+        message: {
+          id: 'msg-ts',
+          content: {
+            text: 'Timestamped message',
+            format: ContentFormat.TEXT,
+          },
+          type: ResponseType.TEXT,
+          sender: MessageSender.ASSISTANT,
+          timestamp: new Date('2026-01-01T00:00:00Z').getTime(),
+        },
+      };
+      const output = coloredFormatter.format(messageResult);
+
+      expect(output.text).toContain('2026-01-01');
+      expect(output.text).toContain('\x1b[');
+    });
+  });
 });
