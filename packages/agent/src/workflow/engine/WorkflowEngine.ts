@@ -433,13 +433,18 @@ export class WorkflowEngine extends EventEmitter {
       const result = this.config.nodeTimeout
         ? await Promise.race([
             execPromise,
-            new Promise<{ success: false; error: { code: string; message: string }; duration: number }>(
-              resolve => setTimeout(
-                () => resolve({
-                  success: false,
-                  error: { code: 'WF_004', message: `Node '${task.id}' timed out` },
-                  duration: this.config.nodeTimeout,
-                }),
+            new Promise<{
+              success: false;
+              error: { code: string; message: string };
+              duration: number;
+            }>(resolve =>
+              setTimeout(
+                () =>
+                  resolve({
+                    success: false,
+                    error: { code: 'WF_004', message: `Node '${task.id}' timed out` },
+                    duration: this.config.nodeTimeout,
+                  }),
                 this.config.nodeTimeout
               )
             ),
