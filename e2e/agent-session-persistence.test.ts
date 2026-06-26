@@ -271,7 +271,7 @@ describe('Agent Session Persistence', () => {
       await Promise.all(sessions.map(s => storage.save(s)));
 
       // Mixed operations
-      const operations = [
+      const operations: Promise<any>[] = [
         ...sessions.map(s => storage.load(s.id)), // Reads
         storage.save({ ...sessions[0], messageCount: 999 }), // Write
         ...sessions.slice(0, 3).map(s => storage.load(s.id)), // More reads
@@ -279,12 +279,13 @@ describe('Agent Session Persistence', () => {
 
       const results = await Promise.all(operations);
 
-      // All operations should complete without error
-      // Some operations may return undefined (e.g., save operations)
-      results.forEach(_result => {
-        // Results can be session objects or undefined for write operations
-        expect(true).toBe(true); // Operation completed without throwing
-      });
+      // Verify all concurrent operations completed successfully
+      // Promise.all completes only if no operation throws an error
+      expect(results).toBeDefined();
+      expect(results.length).toBe(operations.length);
+      // Verify load operations return session objects (non-null)
+      const loadResults = results.filter(r => r !== undefined);
+      expect(loadResults.length).toBeGreaterThan(0);
     });
   });
 
