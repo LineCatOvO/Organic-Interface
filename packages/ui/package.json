@@ -25,6 +25,9 @@
     "@organic/tools": "workspace:*",
     "@organic/agent": "workspace:*"
   },
+  "bin": {
+    "organic-ui": "./dist/cli.js"
+  },
   "devDependencies": {
     "typescript": "^5.4.0"
   }

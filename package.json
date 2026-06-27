@@ -4,6 +4,9 @@
   "private": true,
   "description": "Organic Interface - Plugin-based Agent Framework",
   "type": "module",
+  "bin": {
+    "organic-interface": "./packages/ui/dist/cli.js"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
