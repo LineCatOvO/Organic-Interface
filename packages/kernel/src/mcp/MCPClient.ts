@@ -3,17 +3,15 @@
  *
  * Supports stdio and HTTP transports for MCP server communication.
  */
+import { spawn as spawnProc } from 'child_process';
 import type {
   MCPClientConfig,
-  JSONRPCRequest,
   JSONRPCResponse,
   MCPCallToolResult,
   MCPListToolsResult,
   MCPListResourcesResult,
   MCPReadResourceResult,
-  MCPTransportType,
 } from './MCPTypes.js';
-import { MCPErrorCodes } from './MCPTypes.js';
 
 /** Transport interface for sending/receiving JSON-RPC messages */
 interface MCPTransport {
