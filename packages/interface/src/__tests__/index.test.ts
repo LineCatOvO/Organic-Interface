@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { VERSION } from '../index.js';
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import type {
   OperationType, OperationStatus, OperationResult,
   PermissionLevel, OperationContext,
@@ -9,6 +10,7 @@ import type {
   IEventBus, KernelEventData, AgentEventData,
   OperationEventData, PluginEventData,
 } from '../index.js';
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 describe('@organic/interface', () => {
   it('should export VERSION constant', () => {

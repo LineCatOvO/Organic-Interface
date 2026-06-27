@@ -113,6 +113,11 @@ export class CLI {
    */
   async run(args: string[]): Promise<CommandResult> {
     try {
+      // Show help when no arguments provided
+      if (args.length === 0 || args.every(a => a.trim() === '')) {
+        return this.showHelp([]);
+      }
+
       const input = args.join(' ');
       this.logger.debug(`Running CLI with input: ${input}`);
 
@@ -367,6 +372,32 @@ export class CLI {
 
           return { success: true, code: 0, message: output };
         },
+      })
+    );
+
+    // TUI command (placeholder)
+    this.register(
+      createCommand({
+        name: 'tui',
+        description: 'Launch TUI interface (coming soon)',
+        handler: async () => ({
+          success: true,
+          code: 0,
+          message: 'TUI mode coming soon',
+        }),
+      })
+    );
+
+    // Web command (placeholder)
+    this.register(
+      createCommand({
+        name: 'web',
+        description: 'Launch Web interface (等待制作)',
+        handler: async () => ({
+          success: true,
+          code: 0,
+          message: 'Web interface coming soon - 等待制作',
+        }),
       })
     );
   }

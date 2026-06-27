@@ -79,9 +79,18 @@ describe('CLI', () => {
       expect(result.error).toContain('Unknown command');
     });
 
-    it('should handle parse error', async () => {
+    it('should show help when run with empty string args', async () => {
       const result = await cli.run(['']);
-      expect(result).toBeDefined();
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('organic-cli');
+      expect(result.message).toContain('Available commands');
+    });
+
+    it('should show help when run with no arguments', async () => {
+      const result = await cli.run([]);
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('organic-cli');
+      expect(result.message).toContain('Available commands');
     });
 
     it('should handle help for specific command', async () => {
@@ -269,6 +278,32 @@ describe('CLI', () => {
       it('should use logs alias', async () => {
         const result = await cli.run(['logs']);
         expect(result.success).toBe(true);
+      });
+    });
+
+    describe('tui command', () => {
+      it('should return coming soon message', async () => {
+        const result = await cli.run(['tui']);
+        expect(result.success).toBe(true);
+        expect(result.message).toContain('coming soon');
+      });
+
+      it('should appear in help output', async () => {
+        const result = await cli.run(['--help']);
+        expect(result.message).toContain('tui');
+      });
+    });
+
+    describe('web command', () => {
+      it('should return waiting message', async () => {
+        const result = await cli.run(['web']);
+        expect(result.success).toBe(true);
+        expect(result.message).toContain('等待制作');
+      });
+
+      it('should appear in help output', async () => {
+        const result = await cli.run(['--help']);
+        expect(result.message).toContain('web');
       });
     });
   });
