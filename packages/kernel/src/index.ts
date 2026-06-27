@@ -62,7 +62,44 @@ export {
   type ConfigValue,
 } from './services/index.js';
 
+// MCP module
+export {
+  MCPClient,
+} from './mcp/MCPClient.js';
+export {
+  MCPErrorCodes,
+} from './mcp/MCPTypes.js';
+export type {
+  MCPClientConfig,
+  MCPTransportType,
+  MCPToolDefinition,
+  MCPToolInputSchema,
+  MCPResourceDefinition,
+  MCPCallToolResult,
+  MCPListToolsResult,
+  MCPListResourcesResult,
+  MCPReadResourceResult,
+  JSONRPCRequest,
+  JSONRPCResponse,
+  JSONRPCError,
+  JSONRPCNotification,
+} from './mcp/MCPTypes.js';
+
 /**
  * Module version
  */
 export const VERSION = '0.1.0';
+
+// LLM module
+export {
+  BaseLLMProvider,
+  StreamHandler,
+  LLMManager,
+} from './llm/index.js';
+export type {
+  ChatRole,
+  ChatMessage,
+  ChatOptions,
+  ChatResponse,
+  StreamChunk,
+} from './llm/index.js';
