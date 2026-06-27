@@ -6,6 +6,7 @@
 import { spawn as spawnProc } from 'child_process';
 import type {
   MCPClientConfig,
+  JSONRPCRequest,
   JSONRPCResponse,
   MCPCallToolResult,
   MCPListToolsResult,
@@ -134,8 +135,7 @@ export class MCPClient {
 
   /** Create stdio-based transport using child process */
   private createStdioTransport(config: MCPClientConfig): MCPTransport {
-    const { spawn } = require('child_process') as typeof import('child_process');
-    const child = spawn(config.command!, config.args ?? [], {
+    const child = spawnProc(config.command!, config.args ?? [], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     const messageHandlers: Array<(msg: JSONRPCResponse) => void> = [];
