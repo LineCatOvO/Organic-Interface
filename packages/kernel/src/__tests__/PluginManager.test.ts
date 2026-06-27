@@ -389,4 +389,124 @@ describe('PluginManager', () => {
       expect(disabled[0]).toBe(plugin2);
     });
   });
+
+  // ==================== 新增覆盖率增强测试 ====================
+
+  describe('initialize() - failure paths', () => {
+    it('should throw when initialize returns failure', async () => {
+      const failingPlugin: PluginInterface = {
+        name: 'failing-plugin',
+        version: '1.0.0',
+        description: 'Fails on init',
+        initialize: vi.fn(async () => ({ success: false, error: 'Init failed' })),
+        execute: vi.fn(),
+        shutdown: vi.fn(),
+      };
+
+      await pluginManager.register(failingPlugin);
+      await expect(pluginManager.initialize('failing-plugin')).rejects.toThrow('Init failed');
+    });
+
+    it('should emit plugin:error on initialize failure', async () => {
+      const failingPlugin: PluginInterface = {
+        name: 'error-plugin',
+        version: '1.0.0',
+        initialize: vi.fn(async () => Promise.reject(new Error('Crashed'))),
+        execute: vi.fn(),
+        shutdown: vi.fn(),
+      };
+
+      const errorListener = vi.fn();
+      eventBus.on('plugin:error', errorListener);
+
+      await pluginManager.register(failingPlugin);
+      await expect(pluginManager.initialize('error-plugin')).rejects.toThrow('Crashed');
+
+      await new Promise(resolve => setImmediate(resolve));
+      expect(errorListener).toHaveBeenCalled();
+    });
+  });
+
+  describe('execute() - error handling', () => {
+    it('should handle execute error and emit plugin:error', async () => {
+      const errorPlugin: PluginInterface = {
+        name: 'error-plugin',
+        version: '1.0.0',
+        initialize: vi.fn(async () => ({ success: true })),
+        execute: vi.fn(async () => Promise.reject(new Error('Execute failed'))),
+        shutdown: vi.fn(),
+      };
+
+      const errorListener = vi.fn();
+      eventBus.on('plugin:error', errorListener);
+
+      await pluginManager.register(errorPlugin);
+      const result = await pluginManager.execute('error-plugin', { action: 'test', params: {} });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Execute failed');
+
+      await new Promise(resolve => setImmediate(resolve));
+      expect(errorListener).toHaveBeenCalled();
+    });
+  });
+
+  describe('unregister() - shutdown error', () => {
+    it('should handle shutdown error gracefully', async () => {
+      const badShutdownPlugin: PluginInterface = {
+        name: 'bad-shutdown',
+        version: '1.0.0',
+        initialize: vi.fn(async () => ({ success: true })),
+        execute: vi.fn(),
+        shutdown: vi.fn(async () => Promise.reject(new Error('Shutdown failed'))),
+      };
+
+      await pluginManager.register(badShutdownPlugin);
+      // Should not throw, just log error
+      await pluginManager.unregister('bad-shutdown');
+      expect(pluginManager.has('bad-shutdown')).toBe(false);
+    });
+  });
+
+  describe('shutdown() - error handling', () => {
+    it('should handle shutdown error without throwing', async () => {
+      const errorPlugin: PluginInterface = {
+        name: 'error-plugin',
+        version: '1.0.0',
+        initialize: vi.fn(),
+        execute: vi.fn(),
+        shutdown: vi.fn(async () => Promise.reject(new Error('Shutdown error'))),
+      };
+
+      await pluginManager.register(errorPlugin);
+      // Should not throw
+      await pluginManager.shutdown('error-plugin');
+    });
+  });
+
+  describe('shutdownAll() - error handling', () => {
+    it('should handle multiple shutdown errors', async () => {
+      const plugin1: PluginInterface = {
+        name: 'plugin-1',
+        version: '1.0.0',
+        initialize: vi.fn(),
+        execute: vi.fn(),
+        shutdown: vi.fn(async () => Promise.reject(new Error('Error 1'))),
+      };
+      const plugin2: PluginInterface = {
+        name: 'plugin-2',
+        version: '1.0.0',
+        initialize: vi.fn(),
+        execute: vi.fn(),
+        shutdown: vi.fn(async () => Promise.reject(new Error('Error 2'))),
+      };
+
+      await pluginManager.register(plugin1);
+      await pluginManager.register(plugin2);
+
+      // Should not throw, all plugins cleared
+      await pluginManager.shutdownAll();
+      expect(pluginManager.count()).toBe(0);
+    });
+  });
 });

@@ -95,6 +95,29 @@ describe('ToolService', () => {
       service.unregisterTool('tool-1');
       expect(handler).toHaveBeenCalled();
     });
+
+    it('should return false when tool is executing', async () => {
+      const slowTool: Tool = {
+        getDefinition: () => ({
+          id: 'slow-tool',
+          name: 'SlowTool',
+          description: 'Slow tool',
+          category: 'custom',
+          inputSchema: { type: 'object' },
+          enabled: true,
+          timeout: 10000,
+        }),
+        validate: () => [],
+        execute: vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(resolve, 500))),
+      };
+      service.registerTool(slowTool);
+      // Start execution (don't wait)
+      const execPromise = service.execute('slow-tool', {});
+      // Try to unregister while executing
+      const result = service.unregisterTool('slow-tool');
+      expect(result).toBe(false);
+      await execPromise;
+    });
   });
 
   describe('getTool', () => {
@@ -204,6 +227,92 @@ describe('ToolService', () => {
       expect(result.error).toContain('disabled');
     });
 
+    it('should return error for validation failure', async () => {
+      const validatingTool: Tool = {
+        getDefinition: () => ({
+          id: 'validating-tool',
+          name: 'ValidatingTool',
+          description: 'Tool with validation',
+          category: 'custom',
+          inputSchema: { type: 'object' },
+          enabled: true,
+          timeout: 5000,
+        }),
+        validate: () => [{ path: 'input', message: 'Invalid input' }],
+        execute: vi.fn().mockResolvedValue({ success: true, executionTime: 10 }),
+      };
+      service.registerTool(validatingTool);
+      const result = await service.execute('validating-tool', {});
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Validation failed');
+      expect(result.metadata?.validationErrors).toBeDefined();
+    });
+
+    it('should handle execution timeout', async () => {
+      const slowTool: Tool = {
+        getDefinition: () => ({
+          id: 'timeout-tool',
+          name: 'TimeoutTool',
+          description: 'Slow tool',
+          category: 'custom',
+          inputSchema: { type: 'object' },
+          enabled: true,
+          timeout: 100,
+        }),
+        validate: () => [],
+        execute: vi
+          .fn()
+          .mockImplementation(
+            () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 500))
+          ),
+      };
+      service.registerTool(slowTool);
+      const result = await service.execute('timeout-tool', {}, {}, { timeout: 50 });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('timed out');
+    });
+
+    it('should handle execution error', async () => {
+      const errorTool: Tool = {
+        getDefinition: () => ({
+          id: 'error-tool',
+          name: 'ErrorTool',
+          description: 'Error tool',
+          category: 'custom',
+          inputSchema: { type: 'object' },
+          enabled: true,
+          timeout: 5000,
+        }),
+        validate: () => [],
+        execute: vi.fn().mockRejectedValue(new Error('Execution failed')),
+      };
+      service.registerTool(errorTool);
+      const result = await service.execute('error-tool', {});
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Execution failed');
+    });
+
+    it('should emit execution:error event on error', async () => {
+      const handler = vi.fn();
+      service.on('execution:error', handler);
+      const errorTool: Tool = {
+        getDefinition: () => ({
+          id: 'error-tool',
+          name: 'ErrorTool',
+          description: 'Error tool',
+          category: 'custom',
+          inputSchema: { type: 'object' },
+          enabled: true,
+          timeout: 5000,
+        }),
+        validate: () => [],
+        execute: vi.fn().mockRejectedValue(new Error('Failed')),
+      };
+      service.registerTool(errorTool);
+      await service.execute('error-tool', {});
+      expect(handler).toHaveBeenCalled();
+    });
+
     it('should execute tool successfully', async () => {
       const tool = createMockTool('tool-1', 'Tool1');
       service.registerTool(tool);
@@ -258,6 +367,49 @@ describe('ToolService', () => {
       const stats = service.getToolStats('non-existent');
       expect(stats).toBeUndefined();
     });
+
+    it('should update stats on successful execution', async () => {
+      const tool = createMockTool('tool-1', 'Tool1');
+      service.registerTool(tool);
+      await service.execute('tool-1', {});
+      const stats = service.getToolStats('tool-1');
+      expect(stats?.totalExecutions).toBe(1);
+      expect(stats?.successfulExecutions).toBe(1);
+      expect(stats?.lastSuccessAt).toBeDefined();
+    });
+
+    it('should update stats on failed execution', async () => {
+      const errorTool: Tool = {
+        getDefinition: () => ({
+          id: 'error-tool',
+          name: 'ErrorTool',
+          description: 'Error tool',
+          category: 'custom',
+          inputSchema: { type: 'object' },
+          enabled: true,
+          timeout: 5000,
+        }),
+        validate: () => [],
+        execute: vi.fn().mockRejectedValue(new Error('Failed')),
+      };
+      service.registerTool(errorTool);
+      await service.execute('error-tool', {});
+      const stats = service.getToolStats('error-tool');
+      expect(stats?.totalExecutions).toBe(1);
+      expect(stats?.failedExecutions).toBe(1);
+      expect(stats?.lastFailureAt).toBeDefined();
+    });
+  });
+
+  describe('enableMetrics', () => {
+    it('should skip stats when metrics disabled', async () => {
+      const noMetricsService = new ToolService({ enableMetrics: false });
+      const tool = createMockTool('tool-1', 'Tool1');
+      noMetricsService.registerTool(tool);
+      await noMetricsService.execute('tool-1', {});
+      const stats = noMetricsService.getToolStats('tool-1');
+      expect(stats?.totalExecutions).toBe(0);
+    });
   });
 
   describe('getServiceStats', () => {
@@ -267,6 +419,23 @@ describe('ToolService', () => {
       const stats = service.getServiceStats();
       expect(stats.totalTools).toBe(2);
       expect(stats.enabledTools).toBe(2);
+    });
+
+    it('should return zero avgExecutionTime with no executions', () => {
+      service.registerTool(createMockTool('tool-1', 'Tool1'));
+      const stats = service.getServiceStats();
+      expect(stats.avgExecutionTime).toBe(0);
+    });
+
+    it('should calculate avgExecutionTime after executions', async () => {
+      const tool = createMockTool('tool-1', 'Tool1');
+      service.registerTool(tool);
+      await service.execute('tool-1', {});
+      await service.execute('tool-1', {});
+      const stats = service.getServiceStats();
+      expect(stats.totalExecutions).toBe(2);
+      // avgExecutionTime may be 0 due to mocked execute returning fixed time
+      expect(stats.avgExecutionTime).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -305,6 +474,30 @@ describe('ToolService', () => {
   describe('canAcceptExecution', () => {
     it('should return true when under capacity', () => {
       expect(service.canAcceptExecution()).toBe(true);
+    });
+
+    it('should return false when at max capacity', async () => {
+      const limitedService = new ToolService({ maxConcurrentExecutions: 2 });
+      const slowTool: Tool = {
+        getDefinition: () => ({
+          id: 'slow-tool',
+          name: 'SlowTool',
+          description: 'Slow tool',
+          category: 'custom',
+          inputSchema: { type: 'object' },
+          enabled: true,
+          timeout: 10000,
+        }),
+        validate: () => [],
+        execute: vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(resolve, 200))),
+      };
+      limitedService.registerTool(slowTool);
+      // Start 2 executions
+      const p1 = limitedService.execute('slow-tool', {});
+      const p2 = limitedService.execute('slow-tool', {});
+      // Should not accept more
+      expect(limitedService.canAcceptExecution()).toBe(false);
+      await Promise.all([p1, p2]);
     });
   });
 

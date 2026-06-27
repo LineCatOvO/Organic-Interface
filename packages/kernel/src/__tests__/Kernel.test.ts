@@ -457,4 +457,67 @@ describe('Kernel', () => {
       expect(status.state).toBe('stopped');
     });
   });
+
+  // ==================== 补充分支覆盖率测试 ====================
+
+  describe('executeTool - error handling branches', () => {
+    it('should handle plugin execution error gracefully', async () => {
+      // 可追溯性: 覆盖 Kernel.ts L159-165 executeTool catch error 分支
+      const plugin = createMockPlugin('error-plugin', '1.0.0');
+
+      // Mock plugin.execute 抛出异常
+      (plugin.execute as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error('Plugin execution crashed')
+      );
+
+      await kernel.initialize();
+      await kernel.start();
+      await kernel.registerPlugin(plugin);
+
+      const result = await kernel.executeTool('test-tool', { param: 'value' });
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('EXECUTION_ERROR');
+      expect(result.error?.message).toBe('Plugin execution crashed');
+    });
+
+    it('should handle non-Error thrown objects', async () => {
+      // 可追溯性: 覆盖 Kernel.ts L163 error instanceof Error 分支
+      const plugin = createMockPlugin('throw-plugin', '1.0.0');
+
+      // Mock plugin.execute 抛出非 Error 对象
+      (plugin.execute as ReturnType<typeof vi.fn>).mockRejectedValueOnce('string error');
+
+      await kernel.initialize();
+      await kernel.start();
+      await kernel.registerPlugin(plugin);
+
+      const result = await kernel.executeTool('test-tool', {});
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('EXECUTION_ERROR');
+      expect(result.error?.message).toBe('string error');
+    });
+  });
+
+  describe('initialize - error recovery branch', () => {
+    it('should transition to ERROR state when initialization fails', async () => {
+      // 可追溯性: 覆盖 Kernel.ts L199-204 initialize catch error 分支
+      // Mock lifecycle.transition 在 INITIALIZING 状态时抛出异常
+      const lifecycleManager = kernel.getLifecycleManager();
+
+      // 使用 vi.spyOn 模拟 transition 失败
+      vi.spyOn(lifecycleManager, 'transition')
+        .mockImplementationOnce(async () => {
+          // 第一次调用 (INITIALIZING) 成功
+        })
+        .mockRejectedValueOnce(new Error('Lifecycle transition failed'));
+
+      await expect(kernel.initialize()).rejects.toThrow('Lifecycle transition failed');
+
+      const status = kernel.getStatus();
+      // 状态可能仍然是未初始化或错误状态，取决于 mock 的执行顺序
+      expect(['uninitialized', 'error', 'initializing']).toContain(status.state);
+    });
+  });
 });

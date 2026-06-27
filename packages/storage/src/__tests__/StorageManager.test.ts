@@ -191,4 +191,33 @@ describe('StorageManager', () => {
       });
     });
   });
+
+  describe('createBackend - error handling', () => {
+    it('should throw when creating FILE storage without basePath', async () => {
+      const mgr = new StorageManager({
+        autoInitialize: false,
+        fileConfig: {} as any,
+      });
+      await expect(mgr.createStorage('file-test', StorageBackendType.FILE)).rejects.toThrow(
+        'FileStorage requires basePath configuration'
+      );
+    });
+
+    it('should throw when creating DATABASE storage without dbPath', async () => {
+      const mgr = new StorageManager({
+        autoInitialize: false,
+        databaseConfig: {} as any,
+      });
+      await expect(mgr.createStorage('db-test', StorageBackendType.DATABASE)).rejects.toThrow(
+        'DatabaseStorage requires dbPath configuration'
+      );
+    });
+
+    it('should throw for unknown storage backend type', async () => {
+      const mgr = new StorageManager({ autoInitialize: false });
+      await expect(mgr.createStorage('unknown', 'UNKNOWN' as any)).rejects.toThrow(
+        'Unknown storage backend type'
+      );
+    });
+  });
 });

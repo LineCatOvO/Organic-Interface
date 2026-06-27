@@ -380,5 +380,65 @@ describe('EventBus', () => {
       expect(userListener).toHaveBeenCalledTimes(2);
       expect(orderListener).toHaveBeenCalledTimes(1);
     });
+
+    it('should match suffix wildcard pattern *:created', () => {
+      const syncEventBus = new EventBus({ async: false });
+      const listener = vi.fn();
+
+      syncEventBus.onWildcard('*:created', listener);
+
+      syncEventBus.emit('user:created', { id: 1 });
+      syncEventBus.emit('order:created', { id: 2 });
+      syncEventBus.emit('user:updated', { id: 3 });
+
+      expect(listener).toHaveBeenCalledTimes(2);
+    });
+
+    it('should match wildcard pattern with middle asterisk', () => {
+      const syncEventBus = new EventBus({ async: false });
+      const listener = vi.fn();
+
+      syncEventBus.onWildcard('user:*:done', listener);
+
+      syncEventBus.emit('user:task:done', { id: 1 });
+      syncEventBus.emit('user:action:done', { id: 2 });
+      syncEventBus.emit('user:created', { id: 3 });
+
+      expect(listener).toHaveBeenCalledTimes(2);
+    });
+
+    it('should catch errors in async wildcard listeners', async () => {
+      const asyncEventBus = new EventBus({ async: true });
+      const errorListener = vi.fn(() => {
+        throw new Error('Wildcard error');
+      });
+      const normalListener = vi.fn();
+
+      asyncEventBus.onWildcard('user:*', errorListener);
+      asyncEventBus.onWildcard('user:*', normalListener);
+
+      asyncEventBus.emit('user:created', { id: 1 });
+
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(normalListener).toHaveBeenCalledTimes(1);
+    });
+
+    it('should catch errors in sync wildcard listeners', () => {
+      const syncEventBus = new EventBus({ async: false });
+      const errorListener = vi.fn(() => {
+        throw new Error('Wildcard error');
+      });
+      const normalListener = vi.fn();
+
+      syncEventBus.onWildcard('user:*', errorListener);
+      syncEventBus.onWildcard('user:*', normalListener);
+
+      expect(() => {
+        syncEventBus.emit('user:created', { id: 1 });
+      }).not.toThrow();
+
+      expect(normalListener).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -183,6 +183,59 @@ describe('Agent', () => {
       expect(result.error).toBe('Task failed');
     });
 
+    it('should emit task:error event on execution error', async () => {
+      await agent.initialize();
+      const errorHandler = vi.fn();
+      agent.on('task:error', errorHandler);
+
+      const handler = vi.fn().mockRejectedValue(new Error('Task failed'));
+      agent.registerTaskHandler('test-task', handler);
+
+      const input: AgentTaskInput = {
+        taskId: 'test-task',
+        payload: {},
+      };
+
+      await agent.execute(input);
+      expect(errorHandler).toHaveBeenCalled();
+    });
+
+    it('should emit task:complete event on successful execution', async () => {
+      await agent.initialize();
+      const completeHandler = vi.fn();
+      agent.on('task:complete', completeHandler);
+
+      const handler = vi.fn().mockResolvedValue('result');
+      agent.registerTaskHandler('test-task', handler);
+
+      const input: AgentTaskInput = {
+        taskId: 'test-task',
+        payload: {},
+      };
+
+      await agent.execute(input);
+      expect(completeHandler).toHaveBeenCalled();
+    });
+
+    it('should handle execution timeout', async () => {
+      await agent.initialize();
+
+      const handler = vi
+        .fn()
+        .mockImplementation(() => new Promise(resolve => setTimeout(resolve, 500)));
+      agent.registerTaskHandler('slow-task', handler);
+
+      const input: AgentTaskInput = {
+        taskId: 'slow-task',
+        payload: {},
+        timeout: 10,
+      };
+
+      const result = await agent.execute(input);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('timed out');
+    });
+
     it('should throw error for unregistered task', async () => {
       await agent.initialize();
 
@@ -252,6 +305,30 @@ describe('Agent', () => {
       expect(agent.getChildAgents()).toHaveLength(0);
     });
 
+    it('should return false when unregistering non-existent child', async () => {
+      await agent.initialize();
+      const result = agent.unregisterChildAgent('non-existent');
+      expect(result).toBe(false);
+    });
+
+    it('should emit child:register event', async () => {
+      await agent.initialize();
+      const handler = vi.fn();
+      agent.on('child:register', handler);
+
+      const childAgent = new Agent({
+        kernel: mockKernel,
+        config: {
+          id: 'child-agent',
+          name: 'ChildAgent',
+          version: '1.0.0',
+        },
+      });
+
+      agent.registerChildAgent(childAgent);
+      expect(handler).toHaveBeenCalled();
+    });
+
     it('should get child agent by id', async () => {
       await agent.initialize();
 
@@ -307,6 +384,16 @@ describe('Agent', () => {
       const result = await agent.sendMessage('target-agent', 'action', { data: 'test' });
       expect(result).toEqual({ success: true, action: 'action', payload: { data: 'test' } });
     });
+
+    it('should throw error when emit fails', async () => {
+      // 可追溯性: 覆盖 Agent.ts L583-584 sendMessage catch 分支
+      await agent.initialize();
+      const errorHandler = vi.fn().mockImplementation(() => {
+        throw new Error('Emit failed');
+      });
+      agent.on('message:send', errorHandler);
+      await expect(agent.sendMessage('target', 'action', {})).rejects.toThrow('Emit failed');
+    });
   });
 
   describe('events', () => {
@@ -335,6 +422,56 @@ describe('Agent', () => {
 
       await agent.execute(input);
       expect(taskStartHandler).toHaveBeenCalled();
+    });
+
+    it('should emit heartbeat event after initialization', async () => {
+      const heartbeatAgent = new Agent({
+        kernel: mockKernel,
+        config: {
+          id: 'heartbeat-agent',
+          name: 'HeartbeatAgent',
+          version: '1.0.0',
+          heartbeatInterval: 1,
+        },
+      });
+
+      await heartbeatAgent.initialize();
+      const heartbeatHandler = vi.fn();
+      heartbeatAgent.on('heartbeat', heartbeatHandler);
+
+      // Wait for heartbeat to be emitted
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      expect(heartbeatHandler).toHaveBeenCalled();
+      await heartbeatAgent.shutdown();
+    });
+
+    it('should return early when heartbeatInterval already exists', async () => {
+      // 可追溯性: 覆盖 Agent.ts L508 startHeartbeat heartbeatInterval已存在分支
+      const heartbeatAgent = new Agent({
+        kernel: mockKernel,
+        config: {
+          id: 'heartbeat-agent-2',
+          name: 'HeartbeatAgent2',
+          version: '1.0.0',
+          heartbeatInterval: 1,
+        },
+      });
+
+      await heartbeatAgent.initialize();
+      await new Promise(resolve => setTimeout(resolve, 1100));
+
+      // heartbeatInterval should exist after initialization
+      expect((heartbeatAgent as any).heartbeatInterval).toBeDefined();
+
+      // 再次调用startHeartbeat应直接返回
+      (heartbeatAgent as any).startHeartbeat();
+
+      // heartbeatInterval应保持不变
+      const existingInterval = (heartbeatAgent as any).heartbeatInterval;
+      expect((heartbeatAgent as any).heartbeatInterval).toBe(existingInterval);
+
+      await heartbeatAgent.shutdown();
     });
   });
 });

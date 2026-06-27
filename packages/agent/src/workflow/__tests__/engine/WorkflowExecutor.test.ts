@@ -647,3 +647,35 @@ describe('defaultNodeExecutor', () => {
     await expect(defaultNodeExecutor(task, {}, {})).rejects.toThrow('not implemented');
   });
 });
+
+// ==================== 补充分支覆盖率测试 ====================
+
+describe('WorkflowExecutor - uncovered branches', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  describe('handleTimeout - edge cases', () => {
+    it('should return early when active execution not found', async () => {
+      // 可追溯性: 覆盖 WorkflowExecutor.ts L198-200 handleTimeout active 不存在分支
+      const mockFn = vi.fn(async () => ({ success: true, duration: 10 }));
+      const executor = new WorkflowExecutor(mockFn, { defaultTimeout: 1000 });
+
+      const task = createTask('TimeoutTask', TaskType.TASK, { handler: 'test' });
+      const execution = createTaskExecution(task.id, 'exec-1');
+
+      // 不启动任务，直接手动调用 handleTimeout
+      const result = (executor as any).handleTimeout('non-existent-task-id', execution);
+
+      // 应无返回值（undefined）
+      expect(result).toBeUndefined();
+
+      // 验证 activeExecutions 中无该任务
+      expect(executor.isTaskRunning('non-existent-task-id')).toBe(false);
+    });
+  });
+});

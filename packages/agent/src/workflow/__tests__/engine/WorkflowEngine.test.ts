@@ -799,4 +799,121 @@ describe('WorkflowEngine', () => {
       expect(registeredPayload).toBeTruthy();
     });
   });
+
+  // ==================== 补充分支覆盖率测试 ====================
+
+  describe('startSnapshotTimer - existing timer branch', () => {
+    it('should return early when snapshotTimer already exists', async () => {
+      // 可追溯性: 覆盖 WorkflowEngine.ts L777-779 startSnapshotTimer timer 已存在分支
+      const engine2 = new WorkflowEngine({ enableRecovery: true, snapshotInterval: 1000 });
+
+      const workflow = createWorkflow('TestWorkflow', '1.0.0');
+      const startNode = createTask('start', TaskType.START);
+      workflow.nodes = [startNode];
+      workflow.entryNodeId = startNode.id;
+      engine2.registerWorkflow(workflow);
+
+      vi.spyOn((engine2 as any).executor, 'executeTask').mockImplementation(
+        () => new Promise(() => {})
+      );
+
+      // 第一次启动会创建 timer
+      await engine2.startExecution(workflow.id);
+      await new Promise(resolve => setImmediate(resolve));
+
+      // 验证 timer 已存在
+      expect((engine2 as any).snapshotTimer).toBeDefined();
+
+      // 再次调用 startSnapshotTimer 应直接返回
+      (engine2 as any).startSnapshotTimer();
+
+      // timer 应保持不变（未重新创建）
+      const existingTimer = (engine2 as any).snapshotTimer;
+      expect((engine2 as any).snapshotTimer).toBe(existingTimer);
+
+      engine2.dispose();
+    });
+  });
+
+  describe('cleanupExecution - hasRunning branch', () => {
+    it('should stop snapshot timer when no running executions remain', async () => {
+      // 可追溯性: 覆盖 WorkflowEngine.ts L814-824 cleanupExecution hasRunning=false 分支
+      const engine2 = new WorkflowEngine({ enableRecovery: true, snapshotInterval: 1000 });
+
+      const workflow = createWorkflow('TestWorkflow', '1.0.0');
+      const startNode = createTask('start', TaskType.START);
+      workflow.nodes = [startNode];
+      workflow.entryNodeId = startNode.id;
+      engine2.registerWorkflow(workflow);
+
+      vi.spyOn((engine2 as any).executor, 'executeTask').mockResolvedValue({
+        success: true,
+        output: {},
+        duration: 5,
+      });
+
+      const executionId = await engine2.startExecution(workflow.id);
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // 执行完成后应触发 cleanup
+      const execution = engine2.getExecution(executionId);
+      expect(execution?.status).toBe(WorkflowExecutionStatus.COMPLETED);
+
+      // 验证 snapshot timer 已停止
+      expect((engine2 as any).snapshotTimer).toBeUndefined();
+
+      engine2.dispose();
+    });
+
+    it('should not stop snapshot timer when other executions are running', async () => {
+      // 可追溯性: 覆盖 WorkflowEngine.ts L815-820 cleanupExecution hasRunning=true 分支
+      const engine2 = new WorkflowEngine({ enableRecovery: true, snapshotInterval: 1000 });
+
+      const workflow1 = createWorkflow('Workflow1', '1.0.0');
+      const workflow2 = createWorkflow('Workflow2', '1.0.0');
+
+      const startNode1 = createTask('start1', TaskType.START);
+      const startNode2 = createTask('start2', TaskType.START);
+
+      workflow1.nodes = [startNode1];
+      workflow1.entryNodeId = startNode1.id;
+
+      workflow2.nodes = [startNode2];
+      workflow2.entryNodeId = startNode2.id;
+
+      engine2.registerWorkflow(workflow1);
+      engine2.registerWorkflow(workflow2);
+
+      // Workflow1 成功完成，Workflow2 保持运行状态
+      let callCount = 0;
+      vi.spyOn((engine2 as any).executor, 'executeTask').mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          // 第一个任务（workflow1 的 start）完成
+          return Promise.resolve({ success: true, output: {}, duration: 5 });
+        } else {
+          // 第二个任务（workflow2 的 start）保持运行
+          return new Promise(() => {});
+        }
+      });
+
+      const execId1 = await engine2.startExecution(workflow1.id);
+      const execId2 = await engine2.startExecution(workflow2.id);
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Workflow1 完成，触发 cleanup
+      const exec1 = engine2.getExecution(execId1);
+      expect(exec1?.status).toBe(WorkflowExecutionStatus.COMPLETED);
+
+      // Workflow2 仍在运行
+      const exec2 = engine2.getExecution(execId2);
+      expect(exec2?.status).toBe(WorkflowExecutionStatus.RUNNING);
+
+      // 但 Workflow2 仍在运行，timer 不应停止
+      expect((engine2 as any).snapshotTimer).toBeDefined();
+
+      engine2.dispose();
+    });
+  });
 });

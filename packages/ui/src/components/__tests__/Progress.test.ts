@@ -44,6 +44,13 @@ describe('Progress', () => {
       const state = progress.increment(10);
       expect(state.current).toBe(60);
     });
+
+    it('should increment by default value of 1', () => {
+      const progress = new Progress({ total: 100 });
+      progress.update(50);
+      const state = progress.increment();
+      expect(state.current).toBe(51);
+    });
   });
 
   describe('getState', () => {
@@ -119,6 +126,30 @@ describe('Progress', () => {
       const progress = new Progress({ total: 100, style: 'percentage' });
       const state = progress.update(50);
       expect(state.current).toBe(50);
+    });
+
+    it('should render with showPercentage false', () => {
+      const progress = new Progress({ total: 100, style: 'bar', showPercentage: false });
+      const state = progress.update(50);
+      expect(state.current).toBe(50);
+    });
+
+    it('should render with showElapsed false', () => {
+      const progress = new Progress({ total: 100, style: 'bar', showElapsed: false });
+      const state = progress.update(50);
+      expect(state.current).toBe(50);
+    });
+
+    it('should render with custom label', () => {
+      const progress = new Progress({ total: 100, label: 'Custom' });
+      const state = progress.update(50);
+      expect(state.current).toBe(50);
+    });
+
+    it('should handle total of 0', () => {
+      const progress = new Progress({ total: 0 });
+      const state = progress.getState();
+      expect(state.percentage).toBe(0);
     });
   });
 

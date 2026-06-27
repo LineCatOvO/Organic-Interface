@@ -280,6 +280,80 @@ describe('ContextService', () => {
       const result = service.deleteContextItem(context.id, 'item-1');
       expect(result).toBe(true);
     });
+
+    it('should return null for non-existent context item', () => {
+      const context = service.createContext('session-1', createTestParticipants());
+      const item = service.getContextItem(context.id, 'non-existent');
+      expect(item).toBeNull();
+    });
+
+    it('should return null for context item from non-existent context', () => {
+      const item = service.getContextItem('non-existent', 'item-1');
+      expect(item).toBeNull();
+    });
+
+    it('should filter expired items when includeExpired is false', () => {
+      const context = service.createContext('session-1', createTestParticipants());
+
+      service.addContextItem({
+        id: 'expired-item',
+        type: ContextItemType.MESSAGE,
+        content: { text: 'expired' },
+        contextId: context.id,
+        createdAt: Date.now() - 2000,
+        accessedAt: Date.now() - 2000,
+        updatedAt: Date.now() - 2000,
+        expiresAt: Date.now() - 1000,
+        metadata: {},
+      });
+
+      const items = service.getContextItems(context.id, { includeExpired: false });
+      expect(items.length).toBe(0);
+    });
+
+    it('should filter items by time range', () => {
+      const context = service.createContext('session-1', createTestParticipants());
+      const now = Date.now();
+
+      service.addContextItem({
+        id: 'old-item',
+        type: ContextItemType.MESSAGE,
+        content: { text: 'old' },
+        contextId: context.id,
+        createdAt: now - 5000,
+        accessedAt: now - 5000,
+        updatedAt: now - 5000,
+        metadata: {},
+      });
+
+      service.addContextItem({
+        id: 'new-item',
+        type: ContextItemType.MESSAGE,
+        content: { text: 'new' },
+        contextId: context.id,
+        createdAt: now,
+        accessedAt: now,
+        updatedAt: now,
+        metadata: {},
+      });
+
+      const items = service.getContextItems(context.id, {
+        timeRange: { start: now - 1000, end: now + 1000 },
+      });
+      expect(items.length).toBe(1);
+      expect(items[0].id).toBe('new-item');
+    });
+
+    it('should update non-existent context item returns null', () => {
+      const context = service.createContext('session-1', createTestParticipants());
+      const result = service.updateContextItem(context.id, 'non-existent', { content: 'new' });
+      expect(result).toBeNull();
+    });
+
+    it('should delete item from non-existent context returns false', () => {
+      const result = service.deleteContextItem('non-existent', 'item-1');
+      expect(result).toBe(false);
+    });
   });
 
   describe('state management', () => {
@@ -362,6 +436,27 @@ describe('ContextService', () => {
 
       expect(frame).not.toBeNull();
       expect(frame?.agentId).toBe('agent-1');
+    });
+
+    it('should return null for current frame from empty stack', () => {
+      const context = service.createContext('session-1', createTestParticipants());
+      const frame = service.getCurrentFrame(context.id);
+      expect(frame).toBeNull();
+    });
+
+    it('should get execution stack', () => {
+      const context = service.createContext('session-1', createTestParticipants());
+
+      service.pushExecutionFrame(context.id, 'agent-1');
+      const stack = service.getExecutionStack(context.id);
+
+      expect(stack).not.toBeNull();
+      expect(stack?.stack.length).toBe(1);
+    });
+
+    it('should return null for non-existent execution stack', () => {
+      const stack = service.getExecutionStack('non-existent');
+      expect(stack).toBeNull();
     });
 
     it('should respect max nesting depth', () => {
@@ -456,6 +551,77 @@ describe('ContextService', () => {
         });
       }).toThrow('Source context not found');
     });
+
+    it('should propagate with message time range', () => {
+      const context = service.createContext('session-1', createTestParticipants());
+      const now = Date.now();
+
+      service.addMessage(context.id, {
+        id: 'msg-1',
+        sender: { id: 'user-1', type: 'user' as const, name: 'User' },
+        content: { text: 'Old message', format: ContentFormat.PLAIN_TEXT },
+        type: MessageType.USER_MESSAGE,
+        timestamp: now - 5000,
+        status: MessageStatus.SENT,
+        flags: [],
+      });
+
+      service.addMessage(context.id, {
+        id: 'msg-2',
+        sender: { id: 'user-1', type: 'user' as const, name: 'User' },
+        content: { text: 'New message', format: ContentFormat.PLAIN_TEXT },
+        type: MessageType.USER_MESSAGE,
+        timestamp: now,
+        status: MessageStatus.SENT,
+        flags: [],
+      });
+
+      const result = service.propagateContext(
+        context.id,
+        'target-agent',
+        PropagationMode.INCREMENTAL,
+        {
+          includeMessages: true,
+          includeStates: false,
+          includeToolCalls: false,
+          includeAttachments: false,
+          messageTimeRange: { start: now - 1000, end: now + 1000 },
+        }
+      );
+
+      expect(result.incremental?.messages).toHaveLength(1);
+    });
+
+    it('should propagate with message limit', () => {
+      const context = service.createContext('session-1', createTestParticipants());
+
+      for (let i = 0; i < 10; i++) {
+        service.addMessage(context.id, {
+          id: `msg-${i}`,
+          sender: { id: 'user-1', type: 'user' as const, name: 'User' },
+          content: { text: `Message ${i}`, format: ContentFormat.PLAIN_TEXT },
+          type: MessageType.USER_MESSAGE,
+          timestamp: Date.now() + i,
+          status: MessageStatus.SENT,
+          flags: [],
+        });
+      }
+
+      const result = service.propagateContext(
+        context.id,
+        'target-agent',
+        PropagationMode.INCREMENTAL,
+        {
+          includeMessages: true,
+          includeStates: false,
+          includeToolCalls: false,
+          includeAttachments: false,
+          messageLimit: 3,
+        }
+      );
+
+      expect(result.incremental?.messages).toHaveLength(3);
+    });
   });
 
   describe('statistics', () => {
@@ -522,6 +688,12 @@ describe('ContextService', () => {
       const result = customService.cleanup();
       expect(result.deletedContexts).toBeGreaterThanOrEqual(0);
       expect(result.archivedContexts).toBeGreaterThanOrEqual(0);
+      customService.dispose();
+    });
+
+    it('should stop cleanup timer', () => {
+      const customService = new ContextService({ autoCleanup: true });
+      customService.stopCleanupTimer();
       customService.dispose();
     });
   });
