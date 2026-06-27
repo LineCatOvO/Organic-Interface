@@ -1,6 +1,6 @@
 # Organic-Interface AGENTS_README
 
-> 最后更新: 2026-06-28 | 更新者: Reviewer (闭环阶段 - task-cli-entry-001)
+> 最后更新: 2026-06-28 | 更新者: Reviewer (闭环阶段 - task-P1-008)
 
 ## 项目概述
 
@@ -49,6 +49,19 @@
 │                  @organic/utils (基础工具库)                │
 │           Logger, Errors, Types, Helpers                 │
 └───────────────────────────────────────────────────────────┘
+
+### 统一接口层
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │         @organic/interface (接口契约)     │
+                    │  └── AgentFacade, KernelFacade,         │
+                    │      ToolFacade, StorageFacade,         │
+                    │      EventFacade, OperationTypes        │
+                    └─────────────────────────────────────────┘
+```
+
+@organic/interface 是纯接口包，定义 Web/TUI 前端共用的功能契约，零运行时依赖。
 ```
 
 ### 核心数据流
@@ -160,6 +173,22 @@
 - `UIAgent`: UI 操作代理
 - `UIOperation`: UI 动作封装
 
+### 7. `@organic/interface` - 统一接口契约层
+
+**职责**：
+- 定义 Web/TUI 前端共用的功能契约（纯接口，零运行时依赖）
+- 六大门面接口：Agent / Kernel / Tool / Storage / Event / Operations
+- 前端无关的操作类型定义（OperationType 7 种）
+
+**关键接口**：
+- `IAgentController`: Agent 生命周期管理（start/stop/pause/resume）
+- `IAgentSession`: 会话管理（execute + 状态查询）
+- `IKernelFacade`: Kernel 状态与配置访问
+- `IPluginManager`: 插件注册/卸载/查询
+- `IToolExecutor`: 工具执行与发现
+- `IStorageFacade`: 统一存储 CRUD 操作
+- `IEventBus`: 标准化事件发布/订阅
+
 ## 🎯 关键设计决策记录
 
 ### 决策 1: 插件系统架构
@@ -265,7 +294,7 @@ npm install -g pnpm
 pnpm install
 
 # 4. 验证环境
-pnpm build          # 应该显示 7/7 包构建成功
+pnpm build          # 应该显示 8/8 包构建成功
 pnpm test           # 应该显示所有测试通过
 pnpm lint           # 应该显示 0 errors
 ```
@@ -356,7 +385,7 @@ pnpm lint
 
 # 2. 类型检查与构建 (Build)
 pnpm build
-# 预期: 7/7 包成功 (utils, kernel, tools, plugins, storage, agent, ui)
+# 预期: 8/8 包成功 (utils, kernel, tools, plugins, storage, agent, ui, interface)
 
 # 3. 单元测试 (Test)
 pnpm test
@@ -375,7 +404,7 @@ pnpm vitest run e2e/
     ├─ Step 1: Lint (ESLint + Prettier)
     │   └─ 失败 → 阻止合并
     │
-    ├─ Step 2: Build (Turbo - 7 packages)
+    ├─ Step 2: Build (Turbo - 8 packages)
     │   └─ 失败 → 阻止合并
     │
     ├─ Step 3: Test (Vitest - 全量)
@@ -459,6 +488,7 @@ docker compose --profile dev up --build
 
 _文档维护记录_:
 
+- 2026-06-28: Reviewer (task-P1-008) 新增 @organic/interface 统一接口包信息
 - 2026-06-28: Reviewer (task-cli-entry-001) 新增 CLI 使用说明章节
 - 2026-06-27: Reviewer (P1-001) 更新测试覆盖率基线数据（95.32%/87.21%/96.25%/95.89%）
 - 2026-06-19: CORE-03 新增架构概览图、模块职责、设计决策、测试策略、构建流程章节
