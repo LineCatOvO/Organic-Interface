@@ -1,6 +1,6 @@
 # Organic-Interface AGENTS_README
 
-> 最后更新: 2026-06-27 | 更新者: Reviewer (闭环阶段 - P1-001)
+> 最后更新: 2026-06-28 | 更新者: Reviewer (闭环阶段 - task-cli-entry-001)
 
 ## 项目概述
 
@@ -222,6 +222,16 @@ interface IStorageBackend {
 pnpm install            # 安装依赖
 pnpm build              # 构建所有包 (turbo run build)
 pnpm dev                # 开发模式 (turbo run dev)
+```
+
+### CLI 使用
+
+```bash
+npx organic-interface --help       # 查看帮助信息
+npx organic-interface --version    # 查看版本号
+npx organic-interface help         # 列出可用子命令
+npx organic-interface history      # 查看命令历史
+npx organic-interface log          # 查看操作日志
 ```
 
 ### 测试命令
@@ -449,6 +459,7 @@ docker compose --profile dev up --build
 
 _文档维护记录_:
 
+- 2026-06-28: Reviewer (task-cli-entry-001) 新增 CLI 使用说明章节
 - 2026-06-27: Reviewer (P1-001) 更新测试覆盖率基线数据（95.32%/87.21%/96.25%/95.89%）
 - 2026-06-19: CORE-03 新增架构概览图、模块职责、设计决策、测试策略、构建流程章节
 - 2026-06-18: 初始版本创建
