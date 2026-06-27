@@ -6,8 +6,6 @@ import { MCPClient } from '../MCPClient.js';
 import { MCPErrorCodes } from '../MCPTypes.js';
 import type {
   MCPClientConfig,
-  MCPToolDefinition,
-  MCPResourceDefinition,
 } from '../MCPTypes.js';
 
 /** Create a mock HTTP server that responds to JSON-RPC requests */
