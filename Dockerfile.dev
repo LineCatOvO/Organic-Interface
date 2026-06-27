@@ -30,8 +30,16 @@ RUN pnpm config set store-dir /root/.local/share/pnpm/store
 # 复制workspace配置文件（用于依赖安装）
 COPY pnpm-workspace.yaml pnpm-lock.yaml turbo.json package.json tsconfig.base.json ./
 
+# 先复制各package的package.json以建立workspace链接
+COPY packages/interface/package.json ./packages/interface/package.json
+COPY packages/utils/package.json ./packages/utils/package.json
+COPY packages/kernel/package.json ./packages/kernel/package.json
+COPY packages/plugins/package.json ./packages/plugins/package.json
+COPY packages/tools/package.json ./packages/tools/package.json
+COPY packages/agent/package.json ./packages/agent/package.json
+
 # 安装依赖（使用frozen-lockfile确保版本一致性）
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # 复制源码目录
 COPY packages ./packages
