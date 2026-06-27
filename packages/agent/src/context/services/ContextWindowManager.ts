@@ -10,7 +10,7 @@ import { createLogger, type Logger } from '@organic/utils';
 import type { Message } from '../Message.js';
 import type { ContextItem } from '../models/ContextItem.js';
 import { TokenBudget } from '../TokenBudget.js';
-import { ContextCompressor, CompressionStrategy, type CompressedResult } from '../ContextCompressor.js';
+import { ContextCompressor, CompressionStrategy } from '../ContextCompressor.js';
 
 /**
  * Context window type enumeration

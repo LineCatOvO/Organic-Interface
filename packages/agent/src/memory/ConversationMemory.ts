@@ -2,7 +2,7 @@
  * ConversationMemory - Conversation history storage and retrieval
  */
 import type { Message } from '../context/Message.js';
-import { ContextCompressor, type CompressedResult } from '../context/ContextCompressor.js';
+import { ContextCompressor } from '../context/ContextCompressor.js';
 import { TokenBudget } from '../context/TokenBudget.js';
 
 export interface ConversationMemoryConfig {

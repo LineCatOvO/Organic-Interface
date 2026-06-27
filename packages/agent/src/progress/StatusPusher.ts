@@ -6,7 +6,7 @@
  * @organic/interface IEventBus contract.
  */
 import { EventEmitter } from 'events';
-import type { IEventBus, EventSubscription, EventListener } from '@organic/interface';
+import type { IEventBus, EventSubscription } from '@organic/interface';
 
 export enum TaskState {
   PENDING = 'pending',
