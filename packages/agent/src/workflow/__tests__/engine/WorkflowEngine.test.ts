@@ -886,16 +886,18 @@ describe('WorkflowEngine', () => {
 
       // Workflow1 成功完成，Workflow2 保持运行状态
       let callCount = 0;
-      vi.spyOn((engine2 as any).executor, 'executeTask').mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          // 第一个任务（workflow1 的 start）完成
-          return Promise.resolve({ success: true, output: {}, duration: 5 });
-        } else {
-          // 第二个任务（workflow2 的 start）保持运行
-          return new Promise(() => {});
+      vi.spyOn((engine2 as any).executor, 'executeTask').mockImplementation(
+        () => {
+          callCount++;
+          if (callCount === 1) {
+            // 第一个任务（workflow1 的 start）完成
+            return Promise.resolve({ success: true, output: {}, duration: 5 });
+          } else {
+            // 第二个任务（workflow2 的 start）保持运行
+            return new Promise(() => {});
+          }
         }
-      });
+      );
 
       const execId1 = await engine2.startExecution(workflow1.id);
       const execId2 = await engine2.startExecution(workflow2.id);

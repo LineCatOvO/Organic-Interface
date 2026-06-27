@@ -96,4 +96,5 @@ export enum StorageBackendType {
   MEMORY = 'memory',
   FILE = 'file',
   DATABASE = 'database',
+  GOOGLE_DRIVE = 'google_drive',
 }

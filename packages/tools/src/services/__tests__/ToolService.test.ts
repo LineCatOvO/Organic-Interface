@@ -108,7 +108,9 @@ describe('ToolService', () => {
           timeout: 10000,
         }),
         validate: () => [],
-        execute: vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(resolve, 500))),
+        execute: vi.fn().mockImplementation(
+          () => new Promise(resolve => setTimeout(resolve, 500))
+        ),
       };
       service.registerTool(slowTool);
       // Start execution (don't wait)
@@ -260,11 +262,9 @@ describe('ToolService', () => {
           timeout: 100,
         }),
         validate: () => [],
-        execute: vi
-          .fn()
-          .mockImplementation(
-            () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 500))
-          ),
+        execute: vi.fn().mockImplementation(
+          () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 500))
+        ),
       };
       service.registerTool(slowTool);
       const result = await service.execute('timeout-tool', {}, {}, { timeout: 50 });
@@ -489,7 +489,9 @@ describe('ToolService', () => {
           timeout: 10000,
         }),
         validate: () => [],
-        execute: vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(resolve, 200))),
+        execute: vi.fn().mockImplementation(
+          () => new Promise(resolve => setTimeout(resolve, 200))
+        ),
       };
       limitedService.registerTool(slowTool);
       // Start 2 executions

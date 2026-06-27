@@ -220,9 +220,7 @@ describe('Agent', () => {
     it('should handle execution timeout', async () => {
       await agent.initialize();
 
-      const handler = vi
-        .fn()
-        .mockImplementation(() => new Promise(resolve => setTimeout(resolve, 500)));
+      const handler = vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(resolve, 500)));
       agent.registerTaskHandler('slow-task', handler);
 
       const input: AgentTaskInput = {

@@ -1,0 +1,48 @@
+# =============================================================================
+# Organic-Interface Development Dockerfile
+# Version: 1.0.0
+# Purpose: 开发环境基础镜像，包含Node.js + pnpm + 项目构建环境
+# =============================================================================
+
+# 使用Debian系基础镜像（符合04-technical-rules.md §2.4规范）
+FROM node:20-bookworm AS base
+
+LABEL maintainer="organic-interface-dev"
+LABEL purpose="development-environment"
+
+WORKDIR /app
+
+# 系统依赖安装（构建工具和常用包）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装指定版本的pnpm（项目要求10.28.1）
+RUN npm install -g pnpm@10.28.1
+
+# 配置pnpm存储目录
+ENV PNPM_HOME=/root/.local/share/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+RUN pnpm config set store-dir /root/.local/share/pnpm/store
+
+# 复制workspace配置文件（用于依赖安装）
+COPY pnpm-workspace.yaml pnpm-lock.yaml turbo.json package.json tsconfig.base.json ./
+
+# 安装依赖（使用frozen-lockfile确保版本一致性）
+RUN pnpm install --frozen-lockfile
+
+# 复制源码目录
+COPY packages ./packages
+COPY e2e ./e2e
+COPY vitest.config.ts ./vitest.config.ts
+
+# 构建所有packages（turbo并行构建）
+RUN pnpm build
+
+# 设置环境变量
+ENV NODE_ENV=development
+
+# 默认命令 - 保持容器运行（前台模式）
+CMD ["tail", "-f", "/dev/null"]

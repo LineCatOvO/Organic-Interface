@@ -1,0 +1,93 @@
+# =============================================================================
+# Organic-Interface Dev Docker Compose Configuration
+# Version: 1.0.0
+# Purpose: 开发环境容器编排，支持dev和test两种profile
+# =============================================================================
+
+services:
+  # Dev profile - 开发环境服务
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: organic-interface-dev
+    working_dir: /app
+    environment:
+      - NODE_ENV=development
+      - PNPM_VERSION=10.28.1
+    volumes:
+      # 源码挂载（支持热重载）
+      - ./packages:/app/packages:rw
+      - ./package.json:/app/package.json:ro
+      - ./pnpm-workspace.yaml:/app/pnpm-workspace.yaml:ro
+      - ./turbo.json:/app/turbo.json:ro
+      - ./tsconfig.base.json:/app/tsconfig.base.json:ro
+      # 依赖缓存卷（避免每次重建）
+      - organic-node-modules:/app/node_modules
+      - organic-pnpm-store:/root/.local/share/pnpm/store
+    networks:
+      - organic-dev-network
+    profiles:
+      - dev
+    # 前台模式运行，保持容器活跃
+    command: ["sh", "-c", "pnpm install && tail -f /dev/null"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /app/node_modules/.bin/turbo"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Test profile - 测试环境服务
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: organic-interface-test
+    working_dir: /app
+    environment:
+      - NODE_ENV=test
+      - PNPM_VERSION=10.28.1
+      - VITEST_RUNNER=true
+    volumes:
+      # 源码挂载
+      - ./packages:/app/packages:rw
+      - ./e2e:/app/e2e:rw
+      - ./vitest.config.ts:/app/vitest.config.ts:ro
+      # 依赖缓存卷
+      - organic-node-modules:/app/node_modules
+      - organic-pnpm-store:/root/.local/share/pnpm/store
+      # 测试结果输出
+      - organic-test-results:/app/test-results
+    networks:
+      - organic-dev-network
+    profiles:
+      - test
+    # 执行测试后保持容器活跃
+    command: ["sh", "-c", "pnpm install && pnpm test && tail -f /dev/null"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -d /app/packages"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# 网络定义 - 专用bridge网络
+networks:
+  organic-dev-network:
+    name: organic-dev-network
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+    labels:
+      - "project=organic-interface"
+      - "environment=dev"
+
+# 数据卷定义 - 依赖缓存和测试结果持久化
+volumes:
+  organic-node-modules:
+    name: organic-node-modules
+  organic-pnpm-store:
+    name: organic-pnpm-store
+  organic-test-results:
+    name: organic-test-results

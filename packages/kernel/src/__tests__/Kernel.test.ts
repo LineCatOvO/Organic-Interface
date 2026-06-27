@@ -507,11 +507,9 @@ describe('Kernel', () => {
       const lifecycleManager = kernel.getLifecycleManager();
 
       // 使用 vi.spyOn 模拟 transition 失败
-      vi.spyOn(lifecycleManager, 'transition')
-        .mockImplementationOnce(async () => {
-          // 第一次调用 (INITIALIZING) 成功
-        })
-        .mockRejectedValueOnce(new Error('Lifecycle transition failed'));
+      vi.spyOn(lifecycleManager, 'transition').mockImplementationOnce(async () => {
+        // 第一次调用 (INITIALIZING) 成功
+      }).mockRejectedValueOnce(new Error('Lifecycle transition failed'));
 
       await expect(kernel.initialize()).rejects.toThrow('Lifecycle transition failed');
 

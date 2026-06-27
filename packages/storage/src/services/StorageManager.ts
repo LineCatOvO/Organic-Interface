@@ -11,12 +11,14 @@ import type {
   MemoryStorageConfig,
   FileStorageConfig,
   DatabaseStorageConfig,
+  GoogleDriveConfig,
 } from '../backends/index.js';
 import {
   StorageBackendType,
   MemoryStorage,
   FileStorage,
   DatabaseStorage,
+  GoogleDriveStorage,
 } from '../backends/index.js';
 import { StorageService, type StorageInfo } from './StorageService.js';
 
@@ -32,6 +34,8 @@ export interface StorageManagerConfig {
   fileConfig?: FileStorageConfig;
   /** Database storage config */
   databaseConfig?: DatabaseStorageConfig;
+  /** Google Drive storage config */
+  googleDriveConfig?: GoogleDriveConfig;
   /** Enable auto-initialization */
   autoInitialize?: boolean;
 }
@@ -213,6 +217,12 @@ export class StorageManager {
           throw new Error('DatabaseStorage requires dbPath configuration');
         }
         return new DatabaseStorage(this.config.databaseConfig);
+
+      case StorageBackendType.GOOGLE_DRIVE:
+        if (!this.config.googleDriveConfig?.clientId) {
+          throw new Error('GoogleDriveStorage requires clientId configuration');
+        }
+        return new GoogleDriveStorage(this.config.googleDriveConfig);
 
       default:
         throw new Error(`Unknown storage backend type: ${type}`);
