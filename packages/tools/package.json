@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "@organic/kernel": "workspace:*",
-    "@organic/utils": "workspace:*"
+    "@organic/utils": "workspace:*",
+    "typescript": "^5.4.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
