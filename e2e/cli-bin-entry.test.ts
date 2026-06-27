@@ -57,6 +57,31 @@ describe('CLI Bin Entry Point', () => {
     });
   });
 
+  describe('no arguments', () => {
+    it('should show help when run without arguments', () => {
+      const output = execSync(`${NODE} ${CLI_PATH}`, {
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      expect(output).toContain('organic-interface');
+      expect(output).toContain('Available commands');
+    });
+  });
+
+  describe('tui command', () => {
+    it('should return coming soon message', () => {
+      const output = runCLI('tui');
+      expect(output).toContain('coming soon');
+    });
+  });
+
+  describe('web command', () => {
+    it('should return waiting message', () => {
+      const output = runCLI('web');
+      expect(output).toContain('等待制作');
+    });
+  });
+
   describe('unknown command', () => {
     it('should handle unknown command gracefully', () => {
       expect(() => runCLI('nonexistent-cmd')).toThrow();

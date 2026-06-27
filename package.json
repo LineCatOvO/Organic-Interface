@@ -8,16 +8,24 @@
     "organic-interface": "./packages/ui/dist/cli.js"
   },
   "scripts": {
+    "//build-warning": "⚠️ 宿主机直接运行，推荐使用 dev:docker 在 Docker 沙箱中构建和运行",
     "build": "turbo run build",
+    "//dev-warning": "⚠️ 宿主机直接运行，推荐使用 dev:docker 在 Docker 沙箱中运行",
     "dev": "turbo run dev",
+    "dev:docker": "docker compose -f docker-compose.dev.yml --profile dev up --build",
+    "//test-warning": "⚠️ 宿主机直接运行测试，推荐使用 test:docker 在 Docker 沙箱中运行",
     "test": "vitest run",
+    "test:docker": "docker compose -f docker-compose.dev.yml --profile test up --build",
+    "//test:watch-warning": "⚠️ 宿主机直接运行，推荐使用 test:docker 在 Docker 沙箱中运行",
     "test:watch": "vitest",
+    "//test:coverage-warning": "⚠️ 宿主机直接运行，推荐使用 test:docker 在 Docker 沙箱中运行",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . && prettier --check .",
     "lint:fix": "eslint --fix . && prettier --write .",
     "typecheck": "turbo run typecheck",
     "docs": "typedoc",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "docker:down": "docker compose -f docker-compose.dev.yml down"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

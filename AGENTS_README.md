@@ -256,11 +256,16 @@ pnpm dev                # 开发模式 (turbo run dev)
 ### CLI 使用
 
 ```bash
-npx organic-interface --help       # 查看帮助信息
-npx organic-interface --version    # 查看版本号
-npx organic-interface help         # 列出可用子命令
-npx organic-interface history      # 查看命令历史
-npx organic-interface log          # 查看操作日志
+npx organic-interface               # 无参数默认显示帮助信息
+npx organic-interface --help        # 查看帮助信息（含所有子命令）
+npx organic-interface -h            # 帮助信息（短选项）
+npx organic-interface --version     # 查看版本号
+npx organic-interface -v            # 版本号（短选项）
+npx organic-interface help          # 列出可用子命令详情
+npx organic-interface history       # 查看命令历史
+npx organic-interface log           # 查看操作日志
+npx organic-interface tui           # TUI 界面（coming soon）
+npx organic-interface web           # Web 界面（等待制作）
 ```
 
 ### 测试命令
@@ -488,6 +493,7 @@ docker compose --profile dev up --build
 
 _文档维护记录_:
 
+- 2026-06-28: Reviewer (task-medium-001) 更新 CLI 使用章节（新增 tui/web 子命令 + 无参数默认 help）
 - 2026-06-28: Reviewer (task-P1-008) 新增 @organic/interface 统一接口包信息
 - 2026-06-28: Reviewer (task-cli-entry-001) 新增 CLI 使用说明章节
 - 2026-06-27: Reviewer (P1-001) 更新测试覆盖率基线数据（95.32%/87.21%/96.25%/95.89%）
