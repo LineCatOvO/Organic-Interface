@@ -22,7 +22,8 @@
     "@organic/utils": "workspace:*",
     "@organic/kernel": "workspace:*",
     "@organic/plugins": "workspace:*",
-    "@organic/tools": "workspace:*"
+    "@organic/tools": "workspace:*",
+    "@organic/interface": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

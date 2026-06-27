@@ -212,6 +212,19 @@ export {
   ExecutionCoordinator,
 } from './orchestration/index.js';
 
+// Re-export from progress module
+export {
+  ProgressReporter,
+  type ProgressStep,
+  type ProgressEstimate,
+  type ProgressEvent,
+  type ProgressReporterConfig,
+  StatusPusher,
+  TaskState,
+  type StatusPushEvent,
+  type StatusPushConfig,
+} from './progress/index.js';
+
 /**
  * Module version
  */
