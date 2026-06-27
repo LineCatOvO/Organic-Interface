@@ -53,6 +53,7 @@ describe('GoogleDriveStorage', () => {
         created_at: Date.now(),
         updated_at: Date.now(),
         metadata: {},
+        version: 1,
       };
       await storage.set(entity);
       const result = await storage.get('test-001');
@@ -67,6 +68,7 @@ describe('GoogleDriveStorage', () => {
         created_at: Date.now(),
         updated_at: Date.now(),
         metadata: {},
+        version: 1,
       };
       await storage.set(entity);
       const deleted = await storage.delete('test-002');
