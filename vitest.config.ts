@@ -7,6 +7,7 @@ export default defineConfig({
     environment: 'node',
     include: [
       'packages/kernel/src/__tests__/*.test.ts',
+      'packages/kernel/src/mcp/__tests__/*.test.ts',
       'packages/plugins/src/base/__tests__/*.test.ts',
       'packages/plugins/src/interfaces/__tests__/*.test.ts',
       'packages/plugins/src/loaders/__tests__/*.test.ts',

@@ -282,10 +282,10 @@ describe('CLI', () => {
     });
 
     describe('tui command', () => {
-      it('should return coming soon message', async () => {
+      it('should return requires terminal message in non-TTY', async () => {
         const result = await cli.run(['tui']);
         expect(result.success).toBe(true);
-        expect(result.message).toContain('coming soon');
+        expect(result.message).toContain('interactive terminal');
       });
 
       it('should appear in help output', async () => {

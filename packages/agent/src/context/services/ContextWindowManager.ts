@@ -9,6 +9,8 @@ import { EventEmitter } from 'events';
 import { createLogger, type Logger } from '@organic/utils';
 import type { Message } from '../Message.js';
 import type { ContextItem } from '../models/ContextItem.js';
+import { TokenBudget } from '../TokenBudget.js';
+import { ContextCompressor, CompressionStrategy, type CompressedResult } from '../ContextCompressor.js';
 
 /**
  * Context window type enumeration
@@ -129,6 +131,8 @@ export class ContextWindowManager extends EventEmitter {
   private config: ContextWindowManagerConfig;
   private windows: Map<string, ContextWindow> = new Map();
   private logger: Logger;
+  private tokenBudget: TokenBudget;
+  private compressor: ContextCompressor;
 
   /**
    * Create a new ContextWindowManager
@@ -150,6 +154,13 @@ export class ContextWindowManager extends EventEmitter {
       charsPerToken: config.charsPerToken ?? 4,
     };
     this.logger = createLogger({ prefix: 'context-window-manager' });
+    this.tokenBudget = new TokenBudget({
+      charsPerToken: this.config.charsPerToken,
+    });
+    this.compressor = new ContextCompressor({
+      strategy: CompressionStrategy.TRUNCATE,
+      maxTokens: this.config.defaultConfig?.maxTokens,
+    });
   }
 
   // ==================== Window Creation ====================
@@ -455,27 +466,14 @@ export class ContextWindowManager extends EventEmitter {
    * Estimate token count for messages
    */
   private estimateTokenCount(messages: Message[]): number {
-    const charsPerToken = this.config.charsPerToken ?? 4;
-    let totalChars = 0;
-
-    for (const message of messages) {
-      totalChars += this.estimateMessageTokens(message, charsPerToken) * charsPerToken;
-    }
-
-    return Math.ceil(totalChars / charsPerToken);
+    return this.tokenBudget.estimateMessagesTokens(messages);
   }
 
   /**
    * Estimate tokens for a single message
    */
-  private estimateMessageTokens(message: Message, charsPerToken: number): number {
-    const text = message.content.text ?? '';
-    const textTokens = Math.ceil(text.length / charsPerToken);
-
-    // Add overhead for message structure
-    const overheadTokens = 5;
-
-    return textTokens + overheadTokens;
+  private estimateMessageTokens(message: Message, _charsPerToken: number): number {
+    return this.tokenBudget.estimateMessageTokens(message);
   }
 
   /**

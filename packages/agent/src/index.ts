@@ -116,6 +116,15 @@ export {
   DEFAULT_CONTEXT_SERVICE_CONFIG,
 } from './context/index.js';
 
+// Re-export from memory module
+export {
+  ConversationMemory,
+  type ConversationMemoryConfig,
+  type MemoryEntry,
+  type RelevanceResult,
+  DEFAULT_MEMORY_CONFIG,
+} from './memory/ConversationMemory.js';
+
 // Re-export from workflow module
 export {
   // Task model

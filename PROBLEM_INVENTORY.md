@@ -1,8 +1,8 @@
 ---
 project: Organic-Interface
-last_updated: 2026-06-16 23:55
-updated_by: Coder (Execution 范式)
-total_issues: 7 (open: 0, verified_closed: 7)
+last_updated: 2026-06-28 03:00
+updated_by: Reviewer (闭环阶段 - task-P1-009)
+total_issues: 8 (open: 1, verified_closed: 7)
 ---
 
 # Organic-Interface 项目问题清单
@@ -18,3 +18,4 @@ total_issues: 7 (open: 0, verified_closed: 7)
 | P-OI-005 | 2026-06-14 | 任务执行 | 代码质量 | MEDIUM   | Prettier 格式检查失败：AGENTS_README.md 和 eslint.config.js 格式不符                        | 运行 `pnpm lint`                         | pending-task-P0-organic-interface-verify          | —                      | verified_closed | 待提交   | 2026-06-14 |
 | P-OI-006 | 2026-06-14 | 闭环分析 | 测试     | LOW      | PluginRegistry.ts 测试覆盖率为 0%（测试使用 mock，未直接测试 PluginRegistry 类）            | 运行 `pnpm test:coverage`                | pending-task-P2-organic-interface-open-issues-fix | PluginRegistry.test.ts | verified_closed | 待提交   | 2026-06-16 |
 | P-OI-007 | 2026-06-14 | 闭环分析 | 代码质量 | LOW      | PluginLoader.ts 中 createKernelApi() stub 方法返回 `{success: false}`，调用方依赖需确保一致 | 调用未初始化 PluginLoader 的 executeTool | pending-task-P2-organic-interface-open-issues-fix | PluginLoader.test.ts   | verified_closed | 待提交   | 2026-06-16 |
+| P-OI-008 | 2026-06-28 | 闭环分析 | 配置     | LOW      | GLM-4.7-Flash 模型参数与官方文档不一致：contextWindow 应为 200K（当前 128K），maxTokens 应为 128K（当前 4096）；GLM-4.5 pricing 单位可能为元/1M tokens（当前配置为元/1K tokens） | 查看 `packages/plugins/src/core-conversation/src/config/models/glm.ts` | active-task-P1-009-glm-provider-model-config | — | open | — | — |

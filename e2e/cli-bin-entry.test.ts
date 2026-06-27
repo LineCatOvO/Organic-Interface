@@ -69,9 +69,25 @@ describe('CLI Bin Entry Point', () => {
   });
 
   describe('tui command', () => {
-    it('should return coming soon message', () => {
+    it('should return requires terminal message in non-TTY', () => {
       const output = runCLI('tui');
-      expect(output).toContain('coming soon');
+      expect(output).toContain('interactive terminal');
+    });
+
+    it('should show tui command in help with correct description', () => {
+      const output = runCLI('--help');
+      expect(output).toContain('tui');
+      expect(output).toContain('Launch interactive TUI mode');
+    });
+
+    it('should not contain coming soon in help output', () => {
+      const output = runCLI('--help');
+      expect(output).not.toContain('coming soon');
+    });
+
+    it('should not contain coming soon in tui command output', () => {
+      const output = runCLI('tui');
+      expect(output).not.toContain('coming soon');
     });
   });
 

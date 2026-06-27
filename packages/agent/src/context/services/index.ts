@@ -22,3 +22,19 @@ export {
   PropagationMode,
   DEFAULT_CONTEXT_SERVICE_CONFIG,
 } from './ContextService.js';
+
+export {
+  TokenBudget,
+  type TokenBudgetConfig,
+  type BudgetAllocation,
+  type BudgetResult,
+  DEFAULT_TOKEN_BUDGET_CONFIG,
+} from '../TokenBudget.js';
+
+export {
+  ContextCompressor,
+  type ContextCompressorConfig,
+  type CompressedResult,
+  CompressionStrategy,
+  DEFAULT_COMPRESSOR_CONFIG,
+} from '../ContextCompressor.js';

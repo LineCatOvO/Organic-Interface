@@ -83,7 +83,7 @@ export interface ToolDefinition {
 /**
  * Tool categories
  */
-export type ToolCategory = 'file' | 'shell' | 'search' | 'http' | 'database' | 'custom';
+export type ToolCategory = 'file' | 'shell' | 'search' | 'http' | 'database' | 'git' | 'custom';
 
 /**
  * Tool retry configuration

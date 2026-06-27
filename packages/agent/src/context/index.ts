@@ -75,6 +75,24 @@ export {
   DEFAULT_CONTEXT_WINDOW_MANAGER_CONFIG,
 } from './services/ContextWindowManager.js';
 
+// TokenBudget exports
+export {
+  TokenBudget,
+  type TokenBudgetConfig,
+  type BudgetAllocation,
+  type BudgetResult,
+  DEFAULT_TOKEN_BUDGET_CONFIG,
+} from './TokenBudget.js';
+
+// ContextCompressor exports
+export {
+  ContextCompressor,
+  type ContextCompressorConfig,
+  type CompressedResult,
+  CompressionStrategy,
+  DEFAULT_COMPRESSOR_CONFIG,
+} from './ContextCompressor.js';
+
 // ContextService exports
 export {
   ContextService,

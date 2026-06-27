@@ -6,6 +6,7 @@ import { createLogger, type Logger } from '@organic/utils';
 import { type Command, type CommandResult, createCommand, addSubcommand } from './Command.js';
 import type { CommandParser } from './CommandParser.js';
 import { defaultParser } from './CommandParser.js';
+import { createUIAgent } from '../core/UIAgent.js';
 
 /**
  * CLI configuration
@@ -375,16 +376,77 @@ export class CLI {
       })
     );
 
-    // TUI command (placeholder)
+    // TUI command - interactive mode
     this.register(
       createCommand({
         name: 'tui',
-        description: 'Launch TUI interface (coming soon)',
-        handler: async () => ({
-          success: true,
-          code: 0,
-          message: 'TUI mode coming soon',
-        }),
+        description: 'Launch interactive TUI mode',
+        handler: async (_args, logger) => {
+          if (!process.stdin.isTTY) {
+            return {
+              success: true,
+              code: 0,
+              message: 'TUI mode requires an interactive terminal',
+            };
+          }
+
+          const agent = createUIAgent({ name: 'TUI-Session' });
+          await agent.start();
+          const session = agent.startSession();
+
+          const readline = await import('readline');
+
+          const result = await new Promise<CommandResult>(resolve => {
+            const rl = readline.createInterface({
+              input: process.stdin,
+              output: process.stdout,
+              prompt: 'organic> ',
+            });
+
+            logger.info(`\nOrganic Interface TUI v${this.config.version}`);
+            logger.info(`Agent: ${agent.getConfig().name}`);
+            logger.info(`Session: ${session.sessionId}`);
+            logger.info('Type "help" for commands, "exit" to quit\n');
+
+            rl.prompt();
+
+            rl.on('line', async (line: string) => {
+              const input = line.trim();
+              if (input === 'exit' || input === 'quit') {
+                rl.close();
+              } else if (input === 'help') {
+                logger.info(
+                  'Commands:\n  help    Show this help\n' +
+                    '  status  Show agent status\n' +
+                    '  exit    Exit TUI mode'
+                );
+              } else if (input === 'status') {
+                const state = agent.getState();
+                logger.info(
+                  `Status: ${state.status}\n` +
+                    `Operations: ${state.totalOperations} total, ` +
+                    `${state.successfulOperations} ok, ` +
+                    `${state.failedOperations} failed`
+                );
+              } else if (input) {
+                logger.info(`Unknown: ${input}`);
+              }
+              rl.prompt();
+            });
+
+            rl.on('close', async () => {
+              await agent.endSession(session.sessionId);
+              await agent.stop();
+              resolve({
+                success: true,
+                code: 0,
+                message: 'TUI session ended',
+              });
+            });
+          });
+
+          return result;
+        },
       })
     );
 

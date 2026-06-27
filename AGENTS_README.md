@@ -251,6 +251,9 @@ interface IStorageBackend {
 pnpm install            # 安装依赖
 pnpm build              # 构建所有包 (turbo run build)
 pnpm dev                # 开发模式 (turbo run dev)
+pnpm dev:docker         # Docker 开发环境（推荐）
+pnpm test:docker        # Docker 沙箱测试（推荐）
+pnpm docker:down        # 停止 Docker 编排组
 ```
 
 ### CLI 使用
@@ -264,7 +267,7 @@ npx organic-interface -v            # 版本号（短选项）
 npx organic-interface help          # 列出可用子命令详情
 npx organic-interface history       # 查看命令历史
 npx organic-interface log           # 查看操作日志
-npx organic-interface tui           # TUI 界面（coming soon）
+npx organic-interface tui           # TUI 交互模式
 npx organic-interface web           # Web 界面（等待制作）
 ```
 
@@ -428,7 +431,12 @@ pnpm vitest run e2e/
 # 构建镜像
 docker build -t organic-interface .
 
-# 运行容器（前台模式，强制）
+# 使用 Docker Compose 脚本（推荐）
+pnpm dev:docker         # 开发环境 (docker-compose.dev.yml --profile dev)
+pnpm test:docker        # 测试环境 (docker-compose.dev.yml --profile test)
+pnpm docker:down        # 停止编排组
+
+# 直接运行容器（前台模式，强制）
 docker compose --profile dev up --build
 ```
 
@@ -477,7 +485,9 @@ docker compose --profile dev up --build
 | eslint.config.js         | ESLint 代码检查配置                       |
 | vitest.config.ts         | Vitest 测试配置                           |
 | Dockerfile               | Docker 多阶段构建镜像                     |
+| Dockerfile.dev           | Docker 开发环境基础镜像                   |
 | docker-compose.yml       | 容器编排                                  |
+| docker-compose.dev.yml   | 开发用容器编排（dev/test profile）         |
 | .github/workflows/ci.yml | CI 流程（lint → build → test → coverage） |
 
 ## 📊 性能优化建议（技术债务）
@@ -493,7 +503,7 @@ docker compose --profile dev up --build
 
 _文档维护记录_:
 
-- 2026-06-28: Reviewer (task-medium-001) 更新 CLI 使用章节（新增 tui/web 子命令 + 无参数默认 help）
+- 2026-06-28: Reviewer (task-P1-001) 新增 Docker Compose 脚本说明（dev:docker/test:docker/docker:down）
 - 2026-06-28: Reviewer (task-P1-008) 新增 @organic/interface 统一接口包信息
 - 2026-06-28: Reviewer (task-cli-entry-001) 新增 CLI 使用说明章节
 - 2026-06-27: Reviewer (P1-001) 更新测试覆盖率基线数据（95.32%/87.21%/96.25%/95.89%）

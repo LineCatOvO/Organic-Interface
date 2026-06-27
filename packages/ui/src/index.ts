@@ -89,6 +89,7 @@ export {
 
 // CLI interface
 export { CLI } from './cli/CLI.js';
+export { ApprovalPrompt, type ApprovalRequest } from './cli/ApprovalPrompt.js';
 
 /**
  * Module version

@@ -63,12 +63,8 @@ export {
 } from './services/index.js';
 
 // MCP module
-export {
-  MCPClient,
-} from './mcp/MCPClient.js';
-export {
-  MCPErrorCodes,
-} from './mcp/MCPTypes.js';
+export { MCPClient } from './mcp/MCPClient.js';
+export { MCPErrorCodes } from './mcp/MCPTypes.js';
 export type {
   MCPClientConfig,
   MCPTransportType,
