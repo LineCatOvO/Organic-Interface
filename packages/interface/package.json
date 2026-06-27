@@ -13,10 +13,12 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "test": "cd ../.. && pnpm exec vitest run",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.8"
   }
 }
