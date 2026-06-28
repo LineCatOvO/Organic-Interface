@@ -80,6 +80,8 @@
 
 - 系统生命周期管理（初始化、运行、停止）
 - 插件注册与管理中心
+- LLM 抽象层（多提供商支持、流式响应）
+- MCP 协议集成（客户端、工具/资源发现）
 - 文本服务与格式化
 - API 暴露与路由
 
@@ -87,6 +89,10 @@
 
 - `Kernel`: 主入口，管理全局状态
 - `PluginManager`: 插件注册、发现、依赖解析
+- `LLMManager`: 多提供商注册、模型切换、统一调用
+- `LLMProvider`: 抽象基类，支持 chat/chatStream
+- `StreamHandler`: SSE 流式响应解析
+- `MCPClient`: MCP 协议客户端（stdio/HTTP 传输）
 - `TextService`: 文本格式化、输出处理
 - `LifecycleState`: 状态枚举（INITIALIZING → READY → RUNNING → STOPPED）
 
@@ -131,7 +137,10 @@
 - 工作流引擎（DAG 执行、并行、快照恢复）
 - Agent 注册与调度
 - 任务队列与优先级管理
-- 上下文窗口管理
+- 上下文管理（CRUD 操作、状态管理 setState/getState/deleteState、父子上下文传播 propagateContext）
+- 上下文窗口管理（Token 预算、上下文压缩）
+- 对话记忆（历史存储、摘要生成、相关性检索）
+- 进度报告与状态推送
 
 **关键类**：
 
@@ -139,7 +148,16 @@
 - `TaskQueue`: 优先级任务队列
 - `TaskScheduler`: 任务调度器
 - `AgentRegistry`: Agent 实例管理
+- `ContextManager`: 上下文生命周期管理（创建/获取/删除/归档/恢复）
+- `ContextService`: 上下文服务层（CRUD、消息、状态、执行栈、传播）
+- `ContextItem`: 上下文项数据结构（含工厂函数和工具函数）
+- `Message`: 对话消息数据结构（含工厂函数和验证函数）
 - `ContextWindowManager`: 对话上下文管理
+- `TokenBudget`: Token 预算计算与分配
+- `ContextCompressor`: 上下文摘要压缩
+- `ConversationMemory`: 对话历史与记忆检索
+- `ProgressReporter`: 阶段性进度报告
+- `StatusPusher`: 任务状态事件推送
 
 ### 5. `@organic/tools` - 工具服务
 
@@ -147,14 +165,19 @@
 
 - 工具注册与发现
 - 工具执行引擎
-- 内置工具集（文件操作、搜索、Shell 命令等）
+- 内置工具集（文件操作、搜索、Shell 命令、Git 操作、代码分析）
+- Docker 沙箱隔离执行
+- 权限控制（L1-L4 层级）与审批流
 - 工具上下文与权限控制
 
 **关键类**：
 
 - `ToolRegistry`: 工具注册中心
 - `ToolExecutor`: 执行引擎，含沙箱隔离
-- `BuiltinTools`: FileTool, SearchTool, ShellTool 等
+- `BuiltinTools`: FileTool, SearchTool, ShellTool, GitTool, CodeAnalysisTool 等
+- `DockerSandbox`: Docker 容器隔离执行环境
+- `SandboxManager`: 沙箱池管理与复用策略
+- `PermissionManager`: 工具执行权限门禁（L1-L4 层级）
 - `ToolContext`: 执行上下文封装
 
 ### 6. `@organic/ui` - UI 组件
@@ -163,6 +186,7 @@
 
 - CLI 命令行界面
 - 交互式提示组件
+- 用户审批交互（工具执行权限确认）
 - 用户输入处理
 - 输出渲染
 
@@ -170,6 +194,7 @@
 
 - `CLI`: 主命令行入口
 - `Prompt`: 交互式提示
+- `ApprovalPrompt`: 工具执行审批交互流程
 - `UIAgent`: UI 操作代理
 - `UIOperation`: UI 动作封装
 
@@ -351,10 +376,10 @@ pnpm lint           # 应该显示 0 errors
 
 | 层级           | 当前覆盖率 | 目标 | 状态    |
 | -------------- | ---------- | ---- | ------- |
-| 整体语句覆盖率 | **95.32%** | ≥95% | ✅ 达标 |
-| 整体分支覆盖率 | **87.21%** | ≥88% | ⚠️ 差0.79% |
-| 整体函数覆盖率 | **96.25%** | ≥96% | ✅ 达标 |
-| 整体行覆盖率   | **95.89%** | ≥95% | ✅ 达标 |
+| 整体语句覆盖率 | **93.82%** | ≥93% | ✅ 达标 |
+| 整体分支覆盖率 | **85.39%** | ≥85% | ✅ 达标 |
+| 整体函数覆盖率 | **95.59%** | ≥95% | ✅ 达标 |
+| 整体行覆盖率   | **94.64%** | ≥94% | ✅ 达标 |
 
 ### E2E 测试覆盖的核心场景
 
@@ -466,6 +491,10 @@ docker compose --profile dev up --build
 - `PluginLoader.ts` 中 `createKernelApi()` 的 executeTool 已从 stub 替换为真实实现（P-OI-007 已关闭）
 - @typescript-eslint 不完全支持当前 TypeScript 5.9.3 版本（支持范围 4.7.4-5.6.0），运行时会有警告提示但不影响功能
 - `DatabaseStorage` 命名存在历史遗留（实际为 JSON 文件存储，非 SQLite），计划在未来版本重构
+- P-001-02: `TokenBudget.usedTokens` 死字段（声明但未在估算中使用）
+- P-001-03: `StatusPusher.busSubscriptions` 死字段（声明为空数组，从未填充）
+- P-001-04: `ContextCompressor.summarize()` 为 stub 实现（仅基于元数据生成摘要，未接入 LLM 进行实际语义压缩；compress() 方法完整支持 TRUNCATE/SUMMARIZE/PRIORITY 三种策略）
+- 新增模块（MCPClient/GitTool/ContextCompressor）覆盖率偏低（66%-84%），建议后续迭代补充测试
 - 详见 `PROBLEM_INVENTORY.md`
 
 ## 外部服务/端口
@@ -503,6 +532,7 @@ docker compose --profile dev up --build
 
 _文档维护记录_:
 
+- 2026-06-28: Reviewer (task-P0-001) 新增 LLM/MCP/Git/CodeAnalysis/Sandbox/Permission/Context/Memory/Progress 模块信息，更新测试覆盖率基线
 - 2026-06-28: Reviewer (task-P1-001) 新增 Docker Compose 脚本说明（dev:docker/test:docker/docker:down）
 - 2026-06-28: Reviewer (task-P1-008) 新增 @organic/interface 统一接口包信息
 - 2026-06-28: Reviewer (task-cli-entry-001) 新增 CLI 使用说明章节
